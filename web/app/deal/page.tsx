@@ -133,7 +133,7 @@ export default function DealPage() {
     .trim();
 
   const sendEmailScript = () => {
-    const emailMatch = result.match(/#+\s*(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
+    const emailMatch = result.match(/#+\s*(?:\d+\.\s*)?(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
     const rawText = (emailMatch ? emailMatch[1].trim() : result);
     const emailText = stripMarkdown(rawText).slice(0, 1800);
     const subject = encodeURIComponent(`Offer for ${form.address}`);
