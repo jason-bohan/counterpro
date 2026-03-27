@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { NotifyButton } from "@/components/notify-button";
 
 type Deal = {
   id: number;
@@ -152,7 +153,7 @@ function DashboardInner() {
         </div>
 
         {/* Coming Soon — Full Suite */}
-        <Card className="mt-4 border-2 border-dashed border-muted-foreground/30 opacity-80">
+        <Card className="mt-4 border-2 border-dashed border-muted-foreground/30">
           <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -164,7 +165,7 @@ function DashboardInner() {
                 AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management.
               </p>
             </div>
-            <Button disabled variant="outline" className="shrink-0">Notify me</Button>
+            <NotifyButton />
           </CardContent>
         </Card>
       </main>

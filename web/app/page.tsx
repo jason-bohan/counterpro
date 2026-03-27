@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { NotifyButton } from "@/components/notify-button";
 
 function Logo() {
   return (
@@ -223,7 +224,7 @@ export default function LandingPage() {
 
             {/* Coming Soon — Full Suite */}
             <div className="mt-8 max-w-2xl mx-auto">
-              <Card className="border-2 border-dashed border-muted-foreground/30 opacity-80">
+              <Card className="border-2 border-dashed border-muted-foreground/30">
                 <CardContent className="py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -235,7 +236,7 @@ export default function LandingPage() {
                       AI manages the full back-and-forth. You approve each response before it sends from your own email. Includes thread tracking, deadline alerts, and contingency management.
                     </p>
                   </div>
-                  <Button disabled variant="outline" className="shrink-0">Notify me</Button>
+                  <NotifyButton />
                 </CardContent>
               </Card>
             </div>
