@@ -7,15 +7,15 @@ const SYSTEM_PROMPT = `You are CounterPro, an expert real estate negotiation coa
 everyday people negotiate their own real estate deals without a broker.
 
 Your job is to:
-1. Analyze the deal details provided, including any real comparable sales data
-2. Recommend a specific counter-offer with clear reasoning grounded in local comps
+1. Analyze the deal details provided, including any real market and property data
+2. Recommend a specific counter-offer with clear reasoning grounded in the local market data
 3. Write ready-to-send negotiation scripts (email and verbal)
 4. Identify which contingencies to fight for and which to concede
 5. Flag any red flags or leverage points in the deal
 6. Tell them clearly when to walk away
 
-Be direct, specific, and practical. Use real numbers from the comps data when available.
-Write scripts they can copy and paste. Reference specific comparable sales to justify your counter-offer.
+Be direct, specific, and practical. Use real numbers from the market data when available.
+Write scripts they can copy and paste. Reference specific market stats to justify your counter-offer.
 Assume the user has no real estate experience but is intelligent.
 Format your response with clear sections using headers.`;
 
@@ -27,56 +27,92 @@ async function fetchRentcastData(address: string) {
   const headers = { "X-Api-Key": key, "Accept": "application/json" };
 
   try {
-    const [avmRes, compsRes] = await Promise.all([
-      fetch(`https://api.rentcast.io/v1/avm/sale?address=${encoded}`, { headers }),
-      fetch(`https://api.rentcast.io/v1/properties/sale-comparables?address=${encoded}&radius=0.5&limit=6&status=Sold`, { headers }),
-    ]);
+    // Step 1: get property details (includes zip code, beds/baths/sqft, last sale)
+    const propRes = await fetch(`https://api.rentcast.io/v1/properties?address=${encoded}`, { headers });
+    if (!propRes.ok) return null;
 
-    const avm = avmRes.ok ? await avmRes.json() : null;
-    const compsData = compsRes.ok ? await compsRes.json() : null;
+    const propList = await propRes.json();
+    const prop = Array.isArray(propList) ? propList[0] : propList;
+    if (!prop?.zipCode) return null;
 
-    return { avm, comps: compsData?.comparables ?? null };
+    // Step 2: get zip-level market stats
+    const mktRes = await fetch(`https://api.rentcast.io/v1/markets?zipCode=${prop.zipCode}`, { headers });
+    const market = mktRes.ok ? await mktRes.json() : null;
+
+    // Step 3: pull last sale price from property history if available
+    let lastSalePrice: number | null = null;
+    if (prop.propertyHistory) {
+      const sales = Object.values(prop.propertyHistory as Record<string, any>)
+        .filter((h: any) => h.event === "Sale" && h.price)
+        .sort((a: any, b: any) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
+      if (sales.length > 0) lastSalePrice = (sales[0] as any).price;
+    }
+
+    return { prop, market, lastSalePrice };
   } catch {
     return null;
   }
 }
 
-function formatCompsSection(data: { avm: any; comps: any[] | null } | null): string {
+function formatMarketSection(data: { prop: any; market: any; lastSalePrice: number | null } | null): string {
   if (!data) return "";
 
-  const lines: string[] = ["\n\n---\n## Real Local Market Data (Live)\n"];
+  const { prop, market, lastSalePrice } = data;
+  const lines: string[] = ["\n\n---\n## Live Property & Market Data\n"];
 
-  if (data.avm?.price) {
-    lines.push(`**AI Estimated Value (AVM):** $${Number(data.avm.price).toLocaleString()}`);
-    if (data.avm.priceRangeLow && data.avm.priceRangeHigh) {
-      lines.push(`**Value Range:** $${Number(data.avm.priceRangeLow).toLocaleString()} – $${Number(data.avm.priceRangeHigh).toLocaleString()}`);
+  // Property facts
+  const propFacts = [
+    prop.bedrooms && `${prop.bedrooms} bed`,
+    prop.bathrooms && `${prop.bathrooms} bath`,
+    prop.squareFootage && `${prop.squareFootage.toLocaleString()} sqft`,
+    prop.yearBuilt && `built ${prop.yearBuilt}`,
+    prop.propertyType,
+  ].filter(Boolean).join(" · ");
+  if (propFacts) lines.push(`**Property:** ${propFacts}`);
+
+  if (prop.lotSize) lines.push(`**Lot size:** ${prop.lotSize.toLocaleString()} sqft`);
+
+  if (lastSalePrice && prop.lastSaleDate) {
+    const date = new Date(prop.lastSaleDate).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    lines.push(`**Last sold:** $${lastSalePrice.toLocaleString()} (${date})`);
+    if (prop.squareFootage) {
+      lines.push(`**Last sale $/sqft:** $${Math.round(lastSalePrice / prop.squareFootage)}`);
     }
   }
 
-  if (data.comps && data.comps.length > 0) {
-    lines.push(`\n**Recent Comparable Sales (within 0.5 miles):**`);
-    data.comps.slice(0, 6).forEach((c: any, i: number) => {
-      const price = c.price ? `$${Number(c.price).toLocaleString()}` : "N/A";
-      const sqft = c.squareFootage ? `${c.squareFootage} sqft` : "";
-      const ppsf = c.price && c.squareFootage ? `($${Math.round(c.price / c.squareFootage)}/sqft)` : "";
-      const beds = c.bedrooms ? `${c.bedrooms}bd` : "";
-      const baths = c.bathrooms ? `${c.bathrooms}ba` : "";
-      const dom = c.daysOnMarket != null ? `${c.daysOnMarket} days on market` : "";
-      const date = c.lastSaleDate ? new Date(c.lastSaleDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
-      const addr = c.formattedAddress ?? c.address ?? "";
-      lines.push(`${i + 1}. ${addr} — ${price} ${ppsf} | ${[beds, baths, sqft, dom, date].filter(Boolean).join(" | ")}`);
-    });
+  // Tax assessment trend
+  if (prop.taxAssessments) {
+    const years = Object.keys(prop.taxAssessments).sort();
+    const latest = years[years.length - 1];
+    const prev = years[years.length - 2];
+    if (latest && prop.taxAssessments[latest]?.value) {
+      lines.push(`**${latest} tax assessed value:** $${prop.taxAssessments[latest].value.toLocaleString()}`);
+      if (prev && prop.taxAssessments[prev]?.value) {
+        const change = prop.taxAssessments[latest].value - prop.taxAssessments[prev].value;
+        const pct = ((change / prop.taxAssessments[prev].value) * 100).toFixed(1);
+        lines.push(`**Year-over-year assessment change:** ${change >= 0 ? "+" : ""}${pct}%`);
+      }
+    }
+  }
 
-    const validPrices = data.comps.filter((c: any) => c.price).map((c: any) => c.price);
-    if (validPrices.length > 1) {
-      const avg = Math.round(validPrices.reduce((a: number, b: number) => a + b, 0) / validPrices.length);
-      lines.push(`\n**Average comp sale price:** $${avg.toLocaleString()}`);
-    }
-    const domsArr = data.comps.filter((c: any) => c.daysOnMarket != null).map((c: any) => c.daysOnMarket);
-    if (domsArr.length > 0) {
-      const avgDom = Math.round(domsArr.reduce((a: number, b: number) => a + b, 0) / domsArr.length);
-      lines.push(`**Average days on market:** ${avgDom} days`);
-    }
+  // Notable features
+  const feats = [];
+  if (prop.features?.pool) feats.push("pool");
+  if (prop.features?.garage) feats.push(`${prop.features.garageSpaces ?? 1}-car garage`);
+  if (prop.features?.fireplace) feats.push("fireplace");
+  if (prop.hoa?.fee) feats.push(`HOA $${prop.hoa.fee}/mo`);
+  if (feats.length) lines.push(`**Notable features:** ${feats.join(", ")}`);
+
+  // Zip-level market stats
+  if (market?.saleData) {
+    const s = market.saleData;
+    lines.push(`\n**${prop.zipCode} Zip Code Market Stats:**`);
+    if (s.medianPrice) lines.push(`- Median sale price: $${Number(s.medianPrice).toLocaleString()}`);
+    if (s.averagePrice) lines.push(`- Average sale price: $${Number(s.averagePrice).toLocaleString()}`);
+    if (s.medianPricePerSquareFoot) lines.push(`- Median $/sqft: $${s.medianPricePerSquareFoot.toFixed(0)}`);
+    if (s.medianDaysOnMarket != null) lines.push(`- Median days on market: ${s.medianDaysOnMarket} days`);
+    if (s.averageDaysOnMarket != null) lines.push(`- Average days on market: ${s.averageDaysOnMarket.toFixed(0)} days`);
+    if (s.totalListings) lines.push(`- Active listings in zip: ${s.totalListings}`);
   }
 
   return lines.join("\n");
@@ -94,8 +130,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const marketData = await fetchRentcastData(address);
-    const compsSection = formatCompsSection(marketData);
+    const rentcastData = await fetchRentcastData(address);
+    const marketSection = formatMarketSection(rentcastData);
 
     const prompt = `
 ## Deal Details
@@ -109,14 +145,14 @@ export async function POST(req: NextRequest) {
 **My priorities:** ${priorities}
 **My concerns:** ${concerns}
 ${extra ? `**Additional context:** ${extra}` : ""}
-${compsSection}
+${marketSection}
 
 ---
 
 Please provide a complete negotiation package including:
 
-1. **Deal Assessment** — Is this a good deal? Where is the leverage? Reference the comp data above.
-2. **Recommended Counter-Offer** — Specific number justified by the comps
+1. **Deal Assessment** — Is this a good deal? Where is the leverage? Reference the market data above.
+2. **Recommended Counter-Offer** — Specific number justified by the local market stats
 3. **Key Terms to Negotiate** — Contingencies, closing date, inclusions, concessions
 4. **Email Script** — Ready to send, copy and paste
 5. **Verbal Script** — What to say if negotiating by phone or in person
