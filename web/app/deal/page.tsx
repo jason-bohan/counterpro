@@ -311,7 +311,11 @@ export default function DealPage() {
                     />
                   </div>
 
-                  {error && <p className="text-destructive text-sm">{error}</p>}
+                  {error && (
+                    <p className="text-destructive text-sm">
+                      {error} If this keeps happening, email <a href="mailto:support@counterproai.com" className="underline">support@counterproai.com</a>
+                    </p>
+                  )}
 
                   {loading && (
                     <div className="text-center py-3 text-sm text-primary font-medium animate-pulse">

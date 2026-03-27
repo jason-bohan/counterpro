@@ -265,6 +265,7 @@ export default function LandingPage() {
           <div className="flex gap-6">
             <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <a href="mailto:support@counterproai.com" className="hover:text-foreground transition-colors">Support</a>
           </div>
         </div>
       </footer>

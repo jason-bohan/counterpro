@@ -151,6 +151,10 @@ function DashboardInner() {
           </Card>
         </div>
       </main>
+
+      <footer className="border-t py-5 px-6 text-center text-xs text-muted-foreground">
+        Questions? <a href="mailto:support@counterproai.com" className="hover:text-foreground underline underline-offset-2">support@counterproai.com</a>
+      </footer>
     </div>
   );
 }

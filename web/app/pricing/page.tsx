@@ -125,6 +125,9 @@ export default function PricingPage() {
           </Card>
         </div>
       </main>
+      <p className="text-xs text-muted-foreground mt-8 text-center">
+        Questions? <a href="mailto:support@counterproai.com" className="underline underline-offset-2 hover:text-foreground">support@counterproai.com</a>
+      </p>
     </div>
   );
 }
