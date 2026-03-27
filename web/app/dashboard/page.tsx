@@ -3,12 +3,47 @@
 import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+type Deal = {
+  id: number;
+  address: string;
+  role: string;
+  asking_price: number;
+  offer_amount: number;
+  created_at: string;
+};
+
+type Plan = {
+  plan: string;
+  deals_remaining: number;
+  subscription_end: string | null;
+};
+
 export default function Dashboard() {
   const { user } = useUser();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [plan, setPlan] = useState<Plan | null>(null);
+
+  useEffect(() => {
+    fetch("/api/deals")
+      .then((r) => r.json())
+      .then((d) => {
+        setDeals(d.deals ?? []);
+        setPlan(d.plan ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  const planLabel = () => {
+    if (!plan || plan.plan === "free") return null;
+    if (plan.plan === "subscription") return <Badge className="bg-green-600 text-white">Unlimited subscription</Badge>;
+    if (plan.plan === "single") return <Badge variant="outline">{plan.deals_remaining} deal credit{plan.deals_remaining !== 1 ? "s" : ""} remaining</Badge>;
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -22,7 +57,8 @@ export default function Dashboard() {
             </svg>
             <span className="font-bold text-lg">CounterPro</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {planLabel()}
             <UserButton />
           </div>
         </div>
@@ -51,7 +87,29 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Pricing reminder */}
+        {/* Deal history */}
+        {deals.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">Your deals</h2>
+            <div className="space-y-3">
+              {deals.map((deal) => (
+                <Card key={deal.id}>
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{deal.address}</p>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {deal.role} · Asking ${Number(deal.asking_price).toLocaleString()} · Offer ${Number(deal.offer_amount).toLocaleString()} · {new Date(deal.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="capitalize shrink-0">{deal.role}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pricing */}
         <div className="grid sm:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">

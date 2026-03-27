@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { canUserRunDeal, saveDeal, decrementDealCredit } from "@/lib/db";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -120,6 +122,22 @@ function formatMarketSection(data: { prop: any; market: any; lastSalePrice: numb
 
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await currentUser();
+    const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
+
+    const entitlement = await canUserRunDeal(userId, email);
+    if (!entitlement.allowed) {
+      return NextResponse.json(
+        { error: "payment_required", reason: entitlement.reason },
+        { status: 402 }
+      );
+    }
+
     const body = await req.json();
     const {
       role, address, propertyType, askingPrice,
@@ -168,6 +186,13 @@ Please provide a complete negotiation package including:
     });
 
     const text = message.content[0].type === "text" ? message.content[0].text : "";
+
+    // Save deal and deduct credit in parallel
+    await Promise.all([
+      saveDeal(userId, address, role, Number(askingPrice), Number(offerAmount), text),
+      entitlement.reason === "single_deal" ? decrementDealCredit(userId) : Promise.resolve(),
+    ]);
+
     return NextResponse.json({ package: text });
 
   } catch (err) {

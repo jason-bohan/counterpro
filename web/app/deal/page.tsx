@@ -115,6 +115,10 @@ export default function DealPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+      if (res.status === 402) {
+        window.location.href = "/pricing";
+        return;
+      }
       if (!res.ok) throw new Error("Something went wrong. Please try again.");
       const data = await res.json();
       setResult(data.package);
