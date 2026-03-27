@@ -177,8 +177,8 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold text-center mb-4">Simple pricing</h2>
             <p className="text-muted-foreground text-center mb-12">Pay per deal or subscribe for unlimited access</p>
-            <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-              <Card className="border-2">
+            <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto pt-4">
+              <Card className="border-2 hover:border-primary/40 transition-colors">
                 <CardHeader>
                   <Badge variant="outline" className="w-fit mb-2">Single deal</Badge>
                   <CardTitle className="text-4xl font-bold">$50</CardTitle>
@@ -190,7 +190,7 @@ export default function LandingPage() {
                     <li>✓ Counter-offer with reasoning</li>
                     <li>✓ Email + verbal scripts</li>
                     <li>✓ Red flags & walk-away point</li>
-                    <li>✓ Downloadable as text file</li>
+                    <li>✓ Download as PDF</li>
                   </ul>
                   <Link href="/sign-up?redirect_url=%2Fdeal" className="block pt-2">
                     <Button className="w-full">Get started</Button>
@@ -198,12 +198,11 @@ export default function LandingPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-2 border-primary relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="px-3">Best value</Badge>
+              <Card className="border-2 border-primary relative overflow-visible shadow-md">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                  <Badge className="px-3 shadow-sm">Best value</Badge>
                 </div>
-                <CardHeader>
-                  <Badge variant="outline" className="w-fit mb-2">Subscription</Badge>
+                <CardHeader className="pt-7">
                   <CardTitle className="text-4xl font-bold">$100<span className="text-lg font-normal text-muted-foreground">/mo</span></CardTitle>
                   <p className="text-muted-foreground text-sm">Unlimited deals</p>
                 </CardHeader>

@@ -48,8 +48,8 @@ export default function PricingPage() {
           <p className="text-muted-foreground text-lg">One deal could save you $10,000–$30,000</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-2xl w-full">
-          <Card className="border-2">
+        <div className="grid md:grid-cols-2 gap-8 max-w-2xl w-full pt-4">
+          <Card className="border-2 hover:border-primary/40 transition-colors">
             <CardHeader>
               <Badge variant="outline" className="w-fit mb-2">Single deal</Badge>
               <CardTitle className="text-4xl font-bold">$50</CardTitle>
@@ -76,12 +76,11 @@ export default function PricingPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-primary relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge className="px-3">Best value</Badge>
+          <Card className="border-2 border-primary relative overflow-visible shadow-md">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+              <Badge className="px-3 shadow-sm">Best value</Badge>
             </div>
-            <CardHeader>
-              <Badge variant="outline" className="w-fit mb-2">Subscription</Badge>
+            <CardHeader className="pt-7">
               <CardTitle className="text-4xl font-bold">
                 $100<span className="text-lg font-normal text-muted-foreground">/mo</span>
               </CardTitle>
