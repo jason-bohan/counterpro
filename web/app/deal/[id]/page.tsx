@@ -36,12 +36,12 @@ export default function DealViewPage() {
     .trim();
 
   const copyEmailScript = async () => {
-    const emailMatch = deal.result.match(/#+\s*(?:\d+\.\s*)?(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
-    const rawText = emailMatch ? emailMatch[1].trim() : deal.result;
+    const emailMatch = deal.result.match(/#+[^#\n]*email script[^\n]*\n([\s\S]*?)(?=\n#+\s|$)/i);
+    const rawText = (emailMatch ? emailMatch[1] : deal.result).trim();
     const stripped = stripMarkdown(rawText);
     const subjectMatch = stripped.match(/^subject:\s*(.+)/im);
     const subjectLine = subjectMatch ? subjectMatch[1].trim() : `Counter-Offer — ${deal.address}`;
-    const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").trim().slice(0, 1800);
+    const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").replace(/^---\s*\n/m, "").trim().slice(0, 1800);
     const subject = encodeURIComponent(subjectLine);
     const body = encodeURIComponent(bodyText);
     const mailto = `mailto:?subject=${subject}&body=${body}`;
