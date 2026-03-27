@@ -3,7 +3,8 @@
 import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +24,12 @@ type Plan = {
   subscription_end: string | null;
 };
 
-export default function Dashboard() {
+function DashboardInner() {
   const { user } = useUser();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const searchParams = useSearchParams();
+  const paymentSuccess = searchParams.get("payment") === "success";
 
   useEffect(() => {
     fetch("/api/deals")
@@ -65,6 +68,12 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-10">
+        {paymentSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 font-medium">
+            ✓ Payment successful! You&apos;re all set — start your negotiation below.
+          </div>
+        )}
+
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
             Welcome back{user?.firstName ? `, ${user.firstName}` : ""}
@@ -118,7 +127,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">One negotiation package. Full strategy, scripts, and analysis.</p>
-              <Link href="/deal">
+              <Link href="/pricing">
                 <Button className="w-full" variant="outline">Get package</Button>
               </Link>
             </CardContent>
@@ -130,11 +139,21 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">Unlimited deals per month. Ideal for investors and frequent buyers/sellers.</p>
-              <Button className="w-full">Subscribe</Button>
+              <Link href="/pricing">
+                <Button className="w-full">Subscribe</Button>
+              </Link>
             </CardContent>
           </Card>
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
   );
 }
