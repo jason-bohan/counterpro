@@ -100,7 +100,7 @@ function DashboardInner() {
         {deals.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-4">Your deals</h2>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-4">
               {deals.map((deal) => (
                 <Link key={deal.id} href={`/deal/${deal.id}`}>
                   <Card className="hover:border-primary/50 transition-colors cursor-pointer">
