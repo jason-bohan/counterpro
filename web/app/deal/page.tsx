@@ -12,8 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { UserButton } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 const MARKET_OPTIONS = [
   "Hot sellers market",
@@ -39,6 +37,7 @@ export default function DealPage() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
   const markdownRef = useRef<HTMLDivElement>(null);
 
@@ -93,45 +92,16 @@ export default function DealPage() {
     };
   }, []);
 
-  const downloadPDF = async () => {
-    if (!markdownRef.current) return;
-    
-    try {
-      const canvas = await html2canvas(markdownRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`counterpro-negotiation-package-${form.address.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      // Fallback to text download
-      const blob = new Blob([result], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "counterpro-negotiation-package.txt";
-      a.click();
-    }
+  const printAsPDF = () => {
+    window.print();
+  };
+
+  const copyEmailScript = async () => {
+    const emailMatch = result.match(/#+\s*(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
+    const emailText = emailMatch ? emailMatch[1].trim() : result;
+    await navigator.clipboard.writeText(emailText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -357,23 +327,11 @@ export default function DealPage() {
               </CardContent>
             </Card>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-              <Button
-                variant="outline"
-                onClick={downloadPDF}
-              >
-                Download as PDF
+              <Button variant="outline" onClick={printAsPDF}>
+                Save as PDF (Print)
               </Button>
-              <Button
-                onClick={() => {
-                  // Extract the email script section from the result
-                  const emailMatch = result.match(/(?:Email Script|4\..*?Email Script)[^\n]*\n([\s\S]*?)(?=\n##|\n\*\*5\.|\n5\.|$)/i);
-                  const emailBody = emailMatch ? emailMatch[1].trim() : result;
-                  const subject = encodeURIComponent(`Offer for ${form.address}`);
-                  const body = encodeURIComponent(emailBody);
-                  window.location.href = `mailto:?subject=${subject}&body=${body}`;
-                }}
-              >
-                Send email →
+              <Button onClick={copyEmailScript}>
+                {copied ? "✓ Email script copied!" : "Copy email script"}
               </Button>
             </div>
           </>

@@ -132,6 +132,31 @@
   }
 }
 
+@media print {
+  header, nav, .no-print, button {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    font-size: 13px;
+  }
+  .prose table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .prose th {
+    background: #1e3a5f !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .prose tr:nth-child(even) td {
+    background: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* Clerk components z-index fix */
 .cl-portal {
   z-index: 9999 !important;
