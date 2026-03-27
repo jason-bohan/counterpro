@@ -15,6 +15,8 @@ Live at: **counterproai.com**
 | **Vercel** | Hosting and deployment | vercel.com |
 | **Google Cloud Console** | Places API for address autocomplete on the deal form | console.cloud.google.com |
 | **Rentcast** | Real estate data API — pulls live comparable sales and AVM for the address | rentcast.io |
+| **Stripe** | Payments — $50 one-time deal, $100/month subscription | stripe.com |
+| **Neon** | Postgres database — stores deals and user plan/entitlements | neon.tech |
 | **GitHub** | Source code repository | github.com/jason-bohan/counterpro |
 | **Cloudflare** | DNS for counterproai.com domain | cloudflare.com |
 
@@ -22,7 +24,7 @@ Live at: **counterproai.com**
 
 ## Environment Variables
 
-Create a `.env.local` file in the `web/` directory with:
+Create a `.env.local` file in the `web/` directory:
 
 ```
 ANTHROPIC_API_KEY=
@@ -32,9 +34,17 @@ NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_GOOGLE_MAPS_KEY=
 RENTCAST_API_KEY=
+DATABASE_URL=
+STRIPE_SECRET_KEY=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SINGLE_PRICE_ID=
+STRIPE_SUBSCRIPTION_PRICE_ID=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_APP_URL=https://counterproai.com
+TEST_EMAILS=your@email.com
 ```
 
-All of these also need to be added as environment variables in your Vercel project settings.
+All variables must also be added in Vercel → Project Settings → Environment Variables.
 
 ---
 
@@ -44,8 +54,10 @@ All of these also need to be added as environment variables in your Vercel proje
 - **Tailwind CSS v4** + **shadcn/ui** components
 - **Clerk** for auth
 - **Anthropic SDK** (claude-sonnet-4-6)
-- **Rentcast API** for live comps
+- **Rentcast API** for live property data and market stats
 - **Google Maps Places API** for address autocomplete
+- **Stripe** for payments (Checkout + webhooks)
+- **Neon** serverless Postgres for deal history and user plans
 
 ---
 
@@ -65,4 +77,44 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 vercel --prod
+```
+
+---
+
+## Database Schema
+
+Two tables in Neon Postgres:
+
+**`user_plans`** — tracks each user's payment status
+- `clerk_user_id` — Clerk user ID (primary key)
+- `plan` — `free`, `single`, or `subscription`
+- `deals_remaining` — credits left for single-deal users
+- `subscription_end` — expiry date for subscribers
+
+**`deals`** — every deal ever submitted
+- `id` — auto-increment
+- `clerk_user_id` — which user ran it
+- `address`, `role`, `asking_price`, `offer_amount`
+- `result` — full AI-generated negotiation package text
+- `created_at`
+
+---
+
+## Pricing
+
+| Plan | Price | What it does |
+|---|---|---|
+| Single Deal | $50 one-time | Adds 1 deal credit to the user's account |
+| Monthly Subscription | $100/month | Unlimited deals while subscription is active |
+
+Payments go through Stripe Checkout. After a successful payment, the Stripe webhook fires `checkout.session.completed` which updates `user_plans` in Neon.
+
+---
+
+## Test Account
+
+Add an email to the `TEST_EMAILS` env var (comma-separated) to bypass payment checks entirely:
+
+```
+TEST_EMAILS=you@example.com,colleague@example.com
 ```
