@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { UserButton } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -337,11 +338,21 @@ export default function DealPage() {
             </div>
             <Card>
               <CardContent className="pt-6">
-                <div 
+                <div
                   ref={markdownRef}
-                  className="prose prose-sm max-w-none text-foreground leading-7"
+                  className="prose prose-base max-w-none text-foreground leading-7
+                    prose-headings:text-foreground prose-headings:font-bold
+                    prose-h1:text-2xl prose-h2:text-xl prose-h2:border-b prose-h2:pb-2 prose-h2:mb-4
+                    prose-strong:text-foreground
+                    prose-table:text-sm prose-table:w-full
+                    prose-th:bg-primary prose-th:text-primary-foreground prose-th:px-3 prose-th:py-2 prose-th:text-left
+                    prose-td:px-3 prose-td:py-2 prose-td:border prose-td:border-border
+                    prose-tr:even:bg-muted/40
+                    prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:py-1
+                    prose-code:bg-muted prose-code:px-1 prose-code:rounded
+                    prose-li:my-0.5"
                 >
-                  <ReactMarkdown>{result}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{result}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
