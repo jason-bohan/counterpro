@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { UserButton } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
 
 const MARKET_OPTIONS = [
   "Hot sellers market",
