@@ -119,9 +119,23 @@ export default function DealPage() {
     window.print();
   };
 
+  const stripMarkdown = (text: string) => text
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*+]\s+/gm, "• ")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\|[^\n]+\|/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
   const sendEmailScript = () => {
     const emailMatch = result.match(/#+\s*(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
-    const emailText = (emailMatch ? emailMatch[1].trim() : result).slice(0, 1800);
+    const rawText = (emailMatch ? emailMatch[1].trim() : result);
+    const emailText = stripMarkdown(rawText).slice(0, 1800);
     const subject = encodeURIComponent(`Offer for ${form.address}`);
     const body = encodeURIComponent(emailText);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;

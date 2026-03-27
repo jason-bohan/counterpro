@@ -22,9 +22,23 @@ export default function DealViewPage() {
       .catch(() => setLoading(false));
   }, [id]);
 
+  const stripMarkdown = (text: string) => text
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*+]\s+/gm, "• ")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\|[^\n]+\|/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
   const copyEmailScript = async () => {
     const emailMatch = deal.result.match(/#+\s*(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
-    const emailText = emailMatch ? emailMatch[1].trim() : deal.result;
+    const rawText = emailMatch ? emailMatch[1].trim() : deal.result;
+    const emailText = stripMarkdown(rawText);
     const subject = encodeURIComponent(`Offer for ${deal.address}`);
     const body = encodeURIComponent(emailText.slice(0, 1800));
     const mailto = `mailto:?subject=${subject}&body=${body}`;
