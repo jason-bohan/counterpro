@@ -102,17 +102,22 @@ function DashboardInner() {
             <h2 className="text-lg font-semibold mb-4">Your deals</h2>
             <div className="space-y-3">
               {deals.map((deal) => (
-                <Card key={deal.id}>
-                  <CardContent className="py-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{deal.address}</p>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {deal.role} · Asking ${Number(deal.asking_price).toLocaleString()} · Offer ${Number(deal.offer_amount).toLocaleString()} · {new Date(deal.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="capitalize shrink-0">{deal.role}</Badge>
-                  </CardContent>
-                </Card>
+                <Link key={deal.id} href={`/deal/${deal.id}`}>
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                    <CardContent className="py-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{deal.address}</p>
+                        <p className="text-sm text-muted-foreground capitalize">
+                          {deal.role} · Asking ${Number(deal.asking_price).toLocaleString()} · Offer ${Number(deal.offer_amount).toLocaleString()} · {new Date(deal.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="secondary" className="capitalize">{deal.role}</Badge>
+                        <span className="text-xs text-muted-foreground">View →</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           </div>

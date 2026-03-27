@@ -14,6 +14,18 @@ import ReactMarkdown from "react-markdown";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
 
+const LOADING_MESSAGES = [
+  "Pulling live market data for your zip code...",
+  "Analyzing comparable sales in your area...",
+  "Calculating your negotiating leverage...",
+  "Evaluating days on market and price trends...",
+  "Identifying red flags and contingency strategy...",
+  "Drafting your counter-offer with supporting data...",
+  "Writing your email and verbal scripts...",
+  "Finalizing your walk-away point...",
+  "Almost done — packaging your full strategy...",
+];
+
 const MARKET_OPTIONS = [
   "Hot sellers market",
   "Balanced market",
@@ -37,8 +49,18 @@ export default function DealPage() {
 
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState(0);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingMsg(0);
+    const interval = setInterval(() => {
+      setLoadingMsg(i => (i + 1) % LOADING_MESSAGES.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [loading]);
   const addressInputRef = useRef<HTMLInputElement>(null);
   const markdownRef = useRef<HTMLDivElement>(null);
 
@@ -97,10 +119,12 @@ export default function DealPage() {
     window.print();
   };
 
-  const copyEmailScript = async () => {
+  const sendEmailScript = () => {
     const emailMatch = result.match(/#+\s*(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
-    const emailText = emailMatch ? emailMatch[1].trim() : result;
-    await navigator.clipboard.writeText(emailText);
+    const emailText = (emailMatch ? emailMatch[1].trim() : result).slice(0, 1800);
+    const subject = encodeURIComponent(`Offer for ${form.address}`);
+    const body = encodeURIComponent(emailText);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -289,11 +313,17 @@ export default function DealPage() {
 
                   {error && <p className="text-destructive text-sm">{error}</p>}
 
+                  {loading && (
+                    <div className="text-center py-3 text-sm text-primary font-medium animate-pulse">
+                      {LOADING_MESSAGES[loadingMsg]}
+                    </div>
+                  )}
+
                   <Button type="submit" className="w-full" size="lg" disabled={loading}>
                     {loading ? (
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        Analyzing your deal...
+                        Working on it...
                       </div>
                     ) : (
                       "Get my negotiation package →"
@@ -333,11 +363,17 @@ export default function DealPage() {
             </Card>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <Button variant="outline" onClick={printAsPDF}>
-                Save as PDF (Print)
+                Save as PDF
               </Button>
-              <Button onClick={copyEmailScript}>
-                {copied ? "✓ Email script copied!" : "Copy email script"}
+              <Button onClick={sendEmailScript}>
+                {copied ? "✓ Opening email app..." : "Send email script →"}
               </Button>
+            </div>
+
+            <div className="flex justify-center mt-6">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm">← Back to dashboard</Button>
+              </Link>
             </div>
           </>
         )}
