@@ -1,0 +1,10 @@
+{
+  "css.validate": false,
+  "stylelint.enable": false,
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "emmet.includeLanguages": {
+    "tailwindcss": "html"
+  }
+}

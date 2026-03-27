@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* tailwindcss v4 syntax - IDE warnings expected */
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
