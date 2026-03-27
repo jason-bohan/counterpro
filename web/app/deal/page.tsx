@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { UserButton } from "@clerk/nextjs";
+import ReactMarkdown from "react-markdown";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const MARKET_OPTIONS = [
   "Hot sellers market",
@@ -36,29 +39,99 @@ export default function DealPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const markdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    if (!apiKey || !addressInputRef.current) return;
+    if (!apiKey || !addressInputRef.current) {
+      console.log('Google Maps API key or input ref missing:', { apiKey: !!apiKey, inputRef: !!addressInputRef.current });
+      return;
+    }
 
+    // Check if we're in development
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
+    script.onerror = (error) => {
+      console.error('Google Maps script failed to load:', error);
+      console.log('This might be due to API key restrictions. Make sure your Google Cloud Console allows:');
+      console.log('1. HTTP referrers: localhost:* (for local development)');
+      console.log('2. Or remove referrer restrictions during development');
+    };
     script.onload = () => {
-      const autocomplete = new (window as any).google.maps.places.Autocomplete(
-        addressInputRef.current!,
-        { types: ["address"], componentRestrictions: { country: "us" } }
-      );
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          setForm((f) => ({ ...f, address: place.formatted_address }));
+      try {
+        if (!window.google || !window.google.maps) {
+          console.error('Google Maps not loaded properly');
+          return;
         }
-      });
+        
+        const autocomplete = new window.google.maps.places.Autocomplete(
+          addressInputRef.current!,
+          { types: ["address"], componentRestrictions: { country: "us" } }
+        );
+        
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (place.formatted_address) {
+            setForm((f) => ({ ...f, address: place.formatted_address || "" }));
+          }
+        });
+        
+        console.log('Google Places Autocomplete initialized successfully');
+      } catch (error) {
+        console.error('Error initializing Google Places:', error);
+      }
     };
     document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
+    return () => { 
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
   }, []);
+
+  const downloadPDF = async () => {
+    if (!markdownRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(markdownRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`counterpro-negotiation-package-${form.address.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      // Fallback to text download
+      const blob = new Blob([result], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "counterpro-negotiation-package.txt";
+      a.click();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,7 +314,14 @@ export default function DealPage() {
                   {error && <p className="text-destructive text-sm">{error}</p>}
 
                   <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                    {loading ? "Analyzing your deal..." : "Get my negotiation package →"}
+                    {loading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Analyzing your deal...
+                      </div>
+                    ) : (
+                      "Get my negotiation package →"
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -256,23 +336,21 @@ export default function DealPage() {
               </Button>
             </div>
             <Card>
-              <CardContent className="pt-6 prose prose-sm max-w-none whitespace-pre-wrap text-foreground leading-7">
-                {result}
+              <CardContent className="pt-6">
+                <div 
+                  ref={markdownRef}
+                  className="prose prose-sm max-w-none text-foreground leading-7"
+                >
+                  <ReactMarkdown>{result}</ReactMarkdown>
+                </div>
               </CardContent>
             </Card>
-            <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <Button
                 variant="outline"
-                onClick={() => {
-                  const blob = new Blob([result], { type: "text/plain" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "counterpro-negotiation-package.txt";
-                  a.click();
-                }}
+                onClick={downloadPDF}
               >
-                Download as text file
+                Download as PDF
               </Button>
               <Button
                 onClick={() => {

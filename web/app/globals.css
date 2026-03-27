@@ -130,3 +130,21 @@
     @apply font-sans;
   }
 }
+
+/* Clerk components z-index fix */
+.cl-portal {
+  z-index: 9999 !important;
+}
+
+.cl-user-button-popover {
+  z-index: 9999 !important;
+}
+
+.cl-popover {
+  z-index: 9999 !important;
+}
+
+/* Higher z-index for any dropdown/modal */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
