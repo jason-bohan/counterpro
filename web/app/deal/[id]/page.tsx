@@ -38,12 +38,15 @@ export default function DealViewPage() {
   const copyEmailScript = async () => {
     const emailMatch = deal.result.match(/#+\s*(?:\d+\.\s*)?(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
     const rawText = emailMatch ? emailMatch[1].trim() : deal.result;
-    const emailText = stripMarkdown(rawText);
-    const subject = encodeURIComponent(`Offer for ${deal.address}`);
-    const body = encodeURIComponent(emailText.slice(0, 1800));
+    const stripped = stripMarkdown(rawText);
+    const subjectMatch = stripped.match(/^subject:\s*(.+)/im);
+    const subjectLine = subjectMatch ? subjectMatch[1].trim() : `Counter-Offer — ${deal.address}`;
+    const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").trim().slice(0, 1800);
+    const subject = encodeURIComponent(subjectLine);
+    const body = encodeURIComponent(bodyText);
     const mailto = `mailto:?subject=${subject}&body=${body}`;
     window.location.href = mailto;
-    await navigator.clipboard.writeText(emailText).catch(() => {});
+    await navigator.clipboard.writeText(bodyText).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };

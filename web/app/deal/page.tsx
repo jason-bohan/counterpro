@@ -135,9 +135,14 @@ export default function DealPage() {
   const sendEmailScript = () => {
     const emailMatch = result.match(/#+\s*(?:\d+\.\s*)?(?:📧\s*)?Email Script[\s\S]*?\n([\s\S]*?)(?=\n#+\s*(?:\d+\.|[📧📊💰📋🗣️⚠️🚩])|\n---\n|$)/i);
     const rawText = (emailMatch ? emailMatch[1].trim() : result);
-    const emailText = stripMarkdown(rawText).slice(0, 1800);
-    const subject = encodeURIComponent(`Offer for ${form.address}`);
-    const body = encodeURIComponent(emailText);
+    const stripped = stripMarkdown(rawText);
+    // Extract subject line if Claude included one, use it as mailto subject
+    const subjectMatch = stripped.match(/^subject:\s*(.+)/im);
+    const subjectLine = subjectMatch ? subjectMatch[1].trim() : `Counter-Offer — ${form.address}`;
+    // Remove the subject line from the body so mail clients don't misinterpret it
+    const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").trim().slice(0, 1800);
+    const subject = encodeURIComponent(subjectLine);
+    const body = encodeURIComponent(bodyText);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
