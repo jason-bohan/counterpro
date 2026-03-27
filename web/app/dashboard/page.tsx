@@ -150,6 +150,23 @@ function DashboardInner() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Coming Soon — Full Suite */}
+        <Card className="mt-4 border-2 border-dashed border-muted-foreground/30 opacity-80">
+          <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-xl">$300<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                <Badge variant="outline" className="text-xs">Coming soon</Badge>
+              </div>
+              <p className="font-semibold">Full Negotiation Suite</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management.
+              </p>
+            </div>
+            <Button disabled variant="outline" className="shrink-0">Notify me</Button>
+          </CardContent>
+        </Card>
       </main>
 
       <footer className="border-t py-5 px-6 text-center text-xs text-muted-foreground">
