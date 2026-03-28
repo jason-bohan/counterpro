@@ -163,7 +163,7 @@ function DashboardInner() {
               </div>
               <p className="font-semibold">Team Plan for Brokerages</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Up to 10 agent seats. Unlimited deals, admin dashboard, brokerage branding.
+                12 agent seats included. Unlimited deals, admin dashboard, brokerage branding.
               </p>
             </div>
             <Link href="/enterprise" className="shrink-0">

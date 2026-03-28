@@ -234,7 +234,7 @@ export default function LandingPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <ul className="text-sm space-y-2 text-muted-foreground">
-                    <li>✓ Up to 10 agent seats</li>
+                    <li>✓ 12 agent seats included</li>
                     <li>✓ Unlimited deals per agent</li>
                     <li>✓ Admin dashboard</li>
                     <li>✓ Brokerage branding</li>

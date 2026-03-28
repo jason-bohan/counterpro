@@ -64,7 +64,7 @@ export default function EnterprisePage() {
               <CardTitle className="text-4xl font-bold">
                 $1,000<span className="text-lg font-normal text-muted-foreground">/mo</span>
               </CardTitle>
-              <p className="text-muted-foreground text-sm">Up to 10 agent seats — $100/seat additional</p>
+              <p className="text-muted-foreground text-sm">12 agent seats included — $85/seat additional</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="text-sm space-y-2 text-muted-foreground">
