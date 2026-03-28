@@ -9,14 +9,46 @@ async function isAdmin() {
   return user.emailAddresses.some(e => adminEmails.includes(e.emailAddress.toLowerCase()));
 }
 
+async function ensureTables() {
+  await sql`CREATE TABLE IF NOT EXISTS promo_codes (
+    code TEXT PRIMARY KEY,
+    deals_granted INTEGER NOT NULL DEFAULT 1,
+    uses_remaining INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS promo_redemptions (
+    id SERIAL PRIMARY KEY,
+    code TEXT NOT NULL,
+    clerk_user_id TEXT NOT NULL,
+    redeemed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(code, clerk_user_id)
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS waitlist (
+    id SERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS enterprise_inquiries (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    company TEXT NOT NULL,
+    agents TEXT,
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`;
+}
+
 // GET — fetch all admin data
 export async function GET() {
   if (!await isAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  await ensureTables();
+
   const [promoCodes, redemptions, inquiries, waitlist, recentPlans] = await Promise.all([
     sql`SELECT * FROM promo_codes ORDER BY created_at DESC`,
     sql`SELECT r.*, p.code as promo_code FROM promo_redemptions r JOIN promo_codes p ON r.code = p.code ORDER BY r.redeemed_at DESC LIMIT 50`,
-    sql`SELECT * FROM enterprise_inquiries ORDER BY created_at DESC`.catch(() => []),
+    sql`SELECT * FROM enterprise_inquiries ORDER BY created_at DESC`,
     sql`SELECT * FROM waitlist ORDER BY created_at DESC`,
     sql`SELECT * FROM user_plans ORDER BY updated_at DESC LIMIT 50`,
   ]);
