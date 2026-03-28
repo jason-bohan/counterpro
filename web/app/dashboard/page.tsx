@@ -84,7 +84,7 @@ function DashboardInner() {
         </div>
 
         {/* Start new deal */}
-        <Card className="border-2 border-primary mb-8">
+        <Card data-section="new-deal-cta" className="border-2 border-primary mb-8">
           <CardHeader>
             <CardTitle>Start a new negotiation</CardTitle>
           </CardHeader>
@@ -100,7 +100,7 @@ function DashboardInner() {
 
         {/* Deal history */}
         {deals.length > 0 && (
-          <div className="mb-8">
+          <div data-section="deal-history" className="mb-8">
             <h2 className="text-lg font-semibold mb-4">Your deals</h2>
             <div className="flex flex-col gap-4">
               {deals.map((deal) => (
@@ -126,7 +126,7 @@ function DashboardInner() {
         )}
 
         {/* Pricing */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div data-section="pricing-cards" className="grid sm:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <Badge variant="outline" className="w-fit">Single deal</Badge>
@@ -154,8 +154,25 @@ function DashboardInner() {
           </Card>
         </div>
 
-        {/* Enterprise */}
-        <Card className="mt-4 border-2 hover:border-primary/40 transition-colors">
+        {/* Full Negotiation Suite — Coming Soon */}
+        <Card data-section="full-suite-upsell" className="mt-4 border-2 border-dashed border-muted-foreground/30">
+          <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-xl">$300<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                <Badge variant="outline" className="text-xs">Coming soon</Badge>
+              </div>
+              <p className="font-semibold">Full Negotiation Suite</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management.
+              </p>
+            </div>
+            <NotifyButton />
+          </CardContent>
+        </Card>
+
+        {/* Enterprise Team Plan */}
+        <Card data-section="enterprise-upsell" className="mt-4 border-2 hover:border-primary/40 transition-colors">
           <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -170,23 +187,6 @@ function DashboardInner() {
             <Link href="/enterprise" className="shrink-0">
               <Button variant="outline">Learn more →</Button>
             </Link>
-          </CardContent>
-        </Card>
-
-        {/* Coming Soon — Full Suite */}
-        <Card className="mt-4 border-2 border-dashed border-muted-foreground/30">
-          <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-xl">$300<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
-                <Badge variant="outline" className="text-xs">Coming soon</Badge>
-              </div>
-              <p className="font-semibold">Full Negotiation Suite</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management.
-              </p>
-            </div>
-            <NotifyButton />
           </CardContent>
         </Card>
 
