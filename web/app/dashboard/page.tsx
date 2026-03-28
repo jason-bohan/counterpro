@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { NotifyButton } from "@/components/notify-button";
+import { PromoCode } from "@/components/promo-code";
 
 type Deal = {
   id: number;
@@ -152,6 +153,25 @@ function DashboardInner() {
           </Card>
         </div>
 
+        {/* Enterprise */}
+        <Card className="mt-4 border-2 hover:border-primary/40 transition-colors">
+          <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-xl">$1,000<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                <Badge variant="outline" className="text-xs">Enterprise</Badge>
+              </div>
+              <p className="font-semibold">Team Plan for Brokerages</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Up to 10 agent seats. Unlimited deals, admin dashboard, brokerage branding.
+              </p>
+            </div>
+            <Link href="/enterprise" className="shrink-0">
+              <Button variant="outline">Learn more →</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* Coming Soon — Full Suite */}
         <Card className="mt-4 border-2 border-dashed border-muted-foreground/30">
           <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -168,6 +188,11 @@ function DashboardInner() {
             <NotifyButton />
           </CardContent>
         </Card>
+
+        {/* Promo code */}
+        <div className="mt-4 flex justify-center">
+          <PromoCode onRedeemed={() => window.location.reload()} />
+        </div>
       </main>
 
       <footer className="border-t py-5 px-6 text-center text-xs text-muted-foreground">

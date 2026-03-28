@@ -106,8 +106,29 @@ export default function PricingPage() {
           </Card>
         </div>
 
+        {/* Enterprise */}
+        <div className="mt-6 max-w-2xl w-full">
+          <Card className="border-2 hover:border-primary/40 transition-colors">
+            <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-bold text-xl">$1,000<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                  <Badge variant="outline" className="text-xs">Enterprise</Badge>
+                </div>
+                <p className="font-semibold">Team Plan for Brokerages</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Up to 10 agent seats. Unlimited deals, admin dashboard, and brokerage branding. $100/seat additional.
+                </p>
+              </div>
+              <Link href="/enterprise" className="shrink-0">
+                <Button variant="outline">Learn more →</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Coming Soon — Full Suite */}
-        <div className="mt-8 max-w-2xl w-full">
+        <div className="mt-4 max-w-2xl w-full">
           <Card className="border-2 border-dashed border-muted-foreground/30">
             <CardContent className="py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
