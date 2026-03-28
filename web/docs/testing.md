@@ -12,6 +12,24 @@ Test accounts get unlimited deal runs with no Stripe interaction.
 
 ---
 
+## Testing Clerk Phone OTP
+
+Clerk provides built-in test phone numbers for development mode only.
+
+| Field | Value |
+|---|---|
+| Test phone number | `+1 (000) 000-0000` (any number in the `+1 000 000 XXXX` range) |
+| OTP code | `424242` |
+
+> Only works against the Clerk **development** instance (`*.clerk.accounts.dev`). Production sends real SMS.
+
+To enable phone OTP:
+1. clerk.com → your app → **Configure** → **User & Authentication** → **Email, Phone, Username**
+2. Enable **Phone number** as an identifier
+3. Enable **SMS verification code** as a sign-in method
+
+---
+
 ## Testing Stripe Payments
 
 All Stripe keys in `.env.local` and Vercel are **test/sandbox keys** — no real money moves.
