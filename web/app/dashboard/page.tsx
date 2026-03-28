@@ -56,10 +56,7 @@ function DashboardInner() {
       <header className="border-b bg-background">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-              <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-            </svg>
+            <img src="/logo.svg" alt="CounterPro" width="28" height="28" />
             <span className="font-bold text-lg">CounterPro</span>
           </div>
           <div className="flex items-center gap-3">
