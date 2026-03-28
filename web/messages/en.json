@@ -1,0 +1,349 @@
+{
+  "common": {
+    "brand": "CounterPro",
+    "tagline": "Negotiate your real estate deal like a pro",
+    "support_email": "support@counterproai.com",
+    "copyright": "© 2026 CounterPro. All rights reserved.",
+    "nav": {
+      "sign_in": "Sign in",
+      "get_started": "Get started",
+      "dashboard": "Dashboard",
+      "enterprise": "Enterprise"
+    },
+    "footer": {
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "support": "Support"
+    }
+  },
+  "landing": {
+    "hero": {
+      "badge": "No real estate agent needed",
+      "headline": "Negotiate your real estate deal",
+      "headline_highlight": "like a pro",
+      "subheadline": "Get a tailored counter-offer strategy, ready-to-send email scripts, and word-for-word verbal scripts — powered by AI. One deal could save you $10,000–$30,000.",
+      "cta_single": "Negotiate my deal — $50",
+      "cta_subscription": "Unlimited — $100/mo",
+      "cta_sample": "See a sample package first →",
+      "social_proof": "Takes 2 minutes. No agent. No commission.",
+      "hero_image_alt": "Beautiful family home",
+      "average_savings_label": "Average savings",
+      "average_savings_value": "$18,500",
+      "average_savings_unit": "per negotiation"
+    },
+    "stats": {
+      "single_price": "$50",
+      "single_label": "One-time, one deal",
+      "time_value": "2 min",
+      "time_label": "To get your package",
+      "commission_value": "$0",
+      "commission_label": "Agent commission"
+    },
+    "how_it_works": {
+      "heading": "How it works",
+      "subheading": "Three steps to your negotiation package",
+      "steps": [
+        {
+          "step": "1",
+          "title": "Enter your deal",
+          "desc": "Tell us your role, the property, asking price, offer on the table, and your priorities."
+        },
+        {
+          "step": "2",
+          "title": "AI analyzes your leverage",
+          "desc": "CounterPro evaluates market conditions, the offer gap, contingencies, and your timeline."
+        },
+        {
+          "step": "3",
+          "title": "Get your package",
+          "desc": "Receive a counter-offer number, email script, verbal script, red flags, and your walk-away point."
+        }
+      ]
+    },
+    "features": {
+      "heading": "Everything in your package",
+      "subheading": "One submission. Complete negotiation strategy.",
+      "items": [
+        {
+          "title": "Specific counter-offer",
+          "desc": "Not a range. An exact number with the reasoning behind it."
+        },
+        {
+          "title": "Copy-paste email script",
+          "desc": "Ready to send. Professional, firm, and strategically worded."
+        },
+        {
+          "title": "Word-for-word verbal scripts",
+          "desc": "Know exactly what to say for every scenario — pushback, lowball, walk away."
+        },
+        {
+          "title": "Contingency strategy",
+          "desc": "Which terms to fight for, which to concede, and why."
+        },
+        {
+          "title": "Red flag detection",
+          "desc": "Financing risks, inspection leverage, market timing — flagged automatically."
+        },
+        {
+          "title": "Walk-away point",
+          "desc": "A clear number below which you should walk. No more second-guessing."
+        }
+      ]
+    },
+    "pricing": {
+      "heading": "Simple pricing",
+      "subheading": "Pay per deal or subscribe for unlimited access",
+      "best_value_badge": "Best value",
+      "single": {
+        "badge": "Single deal",
+        "price": "$50",
+        "period": "",
+        "description": "One-time payment",
+        "features": [
+          "Full negotiation package",
+          "Counter-offer with reasoning",
+          "Email + verbal scripts",
+          "Red flags & walk-away point",
+          "Download as PDF"
+        ],
+        "cta": "Get started"
+      },
+      "subscription": {
+        "badge": "Subscription",
+        "price": "$100",
+        "period": "/mo",
+        "description": "Unlimited deals",
+        "features": [
+          "Everything in Single deal",
+          "Unlimited negotiations",
+          "Deal history dashboard",
+          "Cancel anytime",
+          "Best for investors & agents"
+        ],
+        "cta": "Subscribe"
+      },
+      "enterprise": {
+        "badge": "Enterprise",
+        "price": "$1,000",
+        "period": "/mo",
+        "description": "Seat-based for teams",
+        "features": [
+          "12 agent seats included",
+          "Unlimited deals per agent",
+          "Admin dashboard",
+          "Brokerage branding",
+          "Priority support"
+        ],
+        "cta": "Contact us"
+      },
+      "full_suite": {
+        "price": "$300",
+        "period": "/mo",
+        "badge": "Coming soon",
+        "title": "Full Negotiation Suite",
+        "desc": "AI manages the full back-and-forth. You approve each response before it sends from your own email. Includes thread tracking, deadline alerts, and contingency management."
+      }
+    },
+    "faq": {
+      "heading": "Frequently asked questions",
+      "items": [
+        {
+          "q": "Is this legal?",
+          "a": "Yes. Anyone can negotiate their own real estate deal — this is called FSBO (For Sale By Owner) on the seller side, or an unrepresented buyer on the buyer side. CounterPro is a coaching tool, not a broker."
+        },
+        {
+          "q": "Do I need a real estate agent?",
+          "a": "No. That's the point. CounterPro gives you the strategy and scripts to negotiate confidently on your own, potentially saving you the 2-3% agent commission."
+        },
+        {
+          "q": "How accurate is the advice?",
+          "a": "CounterPro is powered by Claude, Anthropic's AI. It provides strategy based on the details you enter. It's not a substitute for a licensed attorney on complex legal matters, but for negotiation strategy it's exceptionally thorough."
+        },
+        {
+          "q": "What if I need more than one deal?",
+          "a": "Subscribe for $100/month and run unlimited deals. If you're an investor or buying and selling frequently, the subscription pays for itself on the first deal."
+        }
+      ]
+    },
+    "cta": {
+      "heading": "Ready to negotiate?",
+      "subheading": "Stop leaving money on the table. Get your negotiation package in minutes.",
+      "button": "Get started — $50"
+    }
+  },
+  "pricing_page": {
+    "heading": "Choose your plan",
+    "subheading": "One deal could save you $10,000–$30,000",
+    "best_value_badge": "Best value",
+    "single": {
+      "badge": "Single deal",
+      "price": "$50",
+      "description": "One-time payment",
+      "features": [
+        "Full negotiation package",
+        "Counter-offer with reasoning",
+        "Email + verbal scripts",
+        "Live comparable sales data",
+        "Red flags & walk-away point",
+        "Download as PDF"
+      ],
+      "cta": "Get started — $50",
+      "cta_loading": "Redirecting..."
+    },
+    "subscription": {
+      "price": "$100",
+      "period": "/mo",
+      "description": "Unlimited deals",
+      "features": [
+        "Everything in Single deal",
+        "Unlimited negotiations",
+        "Deal history dashboard",
+        "Cancel anytime",
+        "Best for investors & agents"
+      ],
+      "cta": "Subscribe — $100/mo",
+      "cta_loading": "Redirecting..."
+    },
+    "enterprise": {
+      "badge": "Enterprise",
+      "price": "$1,000",
+      "period": "/mo",
+      "title": "Team Plan for Brokerages",
+      "desc": "12 agent seats included. Unlimited deals, admin dashboard, and brokerage branding. $85/seat additional.",
+      "cta": "Learn more →"
+    },
+    "full_suite": {
+      "badge": "Coming soon",
+      "price": "$300",
+      "period": "/mo",
+      "title": "Full Negotiation Suite",
+      "desc": "AI manages the full back-and-forth. You approve each response before it sends from your own email. Includes thread tracking, deadline alerts, and contingency management."
+    },
+    "support": "Questions?"
+  },
+  "enterprise_page": {
+    "badge": "Enterprise",
+    "heading": "CounterPro for Brokerages & Teams",
+    "subheading": "Give every agent on your team professional-grade negotiation packages. Seat-based pricing, centralized billing, admin dashboard.",
+    "back_link": "← Individual plans",
+    "team_plan": {
+      "available_badge": "Available now",
+      "badge": "Team plan",
+      "price": "$1,000",
+      "period": "/mo",
+      "description": "12 agent seats included — $85/seat additional",
+      "features": [
+        "Unlimited deals per seat",
+        "Centralized admin dashboard",
+        "Add / remove agents anytime",
+        "Shared deal history across team",
+        "Brokerage branding on packages",
+        "Priority support",
+        "Cancel anytime"
+      ],
+      "cta": "Contact us to get started"
+    },
+    "ai_enterprise": {
+      "badge": "Coming soon",
+      "price": "$5,000",
+      "period": "/mo+",
+      "description": "Custom pricing based on volume",
+      "features": [
+        "Everything in Team plan",
+        "Full AI negotiation suite per agent",
+        "AI drafts responses, agent approves",
+        "Thread tracking & deadline alerts",
+        "Contingency management",
+        "CRM integrations",
+        "Dedicated account manager"
+      ],
+      "cta": "Join the waitlist"
+    },
+    "why_heading": "Why brokerages choose CounterPro",
+    "benefits": [
+      {
+        "title": "Level up every agent",
+        "desc": "Junior agents negotiate with the same data and scripts as your top producers. Consistency across your whole team."
+      },
+      {
+        "title": "Win more deals",
+        "desc": "Agents who know their walk-away point and have scripts ready close faster and with less back-and-forth."
+      },
+      {
+        "title": "NAR ruling ready",
+        "desc": "As buyer representation shifts, your agents need tools to help unrepresented buyers and sellers negotiate confidently."
+      }
+    ],
+    "contact": {
+      "heading": "Get in touch",
+      "subheading": "Tell us about your team and we'll get back to you within one business day.",
+      "success_heading": "✓ Message received!",
+      "success_subheading": "We'll be in touch within one business day at",
+      "fields": {
+        "name": "Your name",
+        "name_placeholder": "Jane Smith",
+        "email": "Work email",
+        "email_placeholder": "jane@brokerage.com",
+        "company": "Brokerage / company",
+        "company_placeholder": "Acme Realty",
+        "agents": "Number of agents",
+        "agents_placeholder": "12",
+        "message": "Anything else?",
+        "message_optional": "(optional)",
+        "message_placeholder": "Tell us about your team, use case, or questions..."
+      },
+      "error": "Something went wrong. Email us directly at",
+      "cta": "Send inquiry →",
+      "cta_loading": "Sending..."
+    }
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "subtitle": "Ready to negotiate your next deal?",
+    "payment_success": "✓ Payment successful! You're all set — start your negotiation below.",
+    "new_deal": {
+      "heading": "Start a new negotiation",
+      "desc": "Enter your deal details and get a complete counter-offer strategy, email scripts, and verbal scripts in minutes.",
+      "cta": "New deal →"
+    },
+    "deal_history_heading": "Your deals",
+    "deal_view": "View →",
+    "plan_badges": {
+      "subscription": "Unlimited subscription",
+      "single_credit": "deal credit",
+      "single_credits": "deal credits remaining"
+    },
+    "pricing": {
+      "single": {
+        "badge": "Single deal",
+        "price": "$50",
+        "desc": "One negotiation package. Full strategy, scripts, and analysis.",
+        "cta": "Get package"
+      },
+      "subscription": {
+        "badge": "Best value",
+        "price": "$100",
+        "period": "/mo",
+        "desc": "Unlimited deals per month. Ideal for investors and frequent buyers/sellers.",
+        "cta": "Subscribe"
+      }
+    },
+    "full_suite": {
+      "price": "$300",
+      "period": "/mo",
+      "badge": "Coming soon",
+      "title": "Full Negotiation Suite",
+      "desc": "AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management."
+    },
+    "enterprise": {
+      "price": "$1,000",
+      "period": "/mo",
+      "badge": "Enterprise",
+      "title": "Team Plan for Brokerages",
+      "desc": "12 agent seats included. Unlimited deals, admin dashboard, brokerage branding.",
+      "cta": "Learn more →"
+    },
+    "support": "Questions?",
+    "support_email": "support@counterproai.com"
+  }
+}
