@@ -132,11 +132,12 @@ function DashboardInner() {
               <Badge variant="outline" className="w-fit">Single deal</Badge>
               <CardTitle className="text-2xl mt-2">$50</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">One negotiation package. Full strategy, scripts, and analysis.</p>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">One negotiation package. Full strategy, scripts, and analysis.</p>
               <Link href="/pricing">
                 <Button className="w-full" variant="outline">Get package</Button>
               </Link>
+              <PromoCode onRedeemed={() => window.location.reload()} />
             </CardContent>
           </Card>
           <Card className="border-primary border-2">
@@ -189,10 +190,6 @@ function DashboardInner() {
           </CardContent>
         </Card>
 
-        {/* Promo code */}
-        <div className="mt-4 flex justify-center">
-          <PromoCode onRedeemed={() => window.location.reload()} />
-        </div>
       </main>
 
       <footer className="border-t py-5 px-6 text-center text-xs text-muted-foreground">
