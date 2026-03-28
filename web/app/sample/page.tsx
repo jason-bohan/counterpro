@@ -130,7 +130,7 @@ export default function SamplePage() {
       {/* Header */}
       <header className="border-b bg-background print:hidden">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Logo size={28} href="/" />
+          <Logo size={44} href="/" />
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="text-xs">Sample deal</Badge>
           </div>

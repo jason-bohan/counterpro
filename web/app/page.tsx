@@ -18,7 +18,7 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Logo />
+          <Logo href="/" />
           <nav className="flex items-center gap-4">
             <Link href="/enterprise" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
               {t("common.nav.enterprise")}
@@ -218,9 +218,9 @@ export default function LandingPage() {
               </Card>
             </div>
 
-            {/* Full Suite — Coming Soon */}
+            {/* Full Negotiation Suite */}
             <div className="mt-4 max-w-2xl mx-auto">
-              <Card className="border-2 border-dashed border-muted-foreground/30">
+              <Card className="border-2 hover:border-primary/40 transition-colors">
                 <CardContent className="py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -228,12 +228,14 @@ export default function LandingPage() {
                         {landing.pricing.full_suite.price}
                         <span className="text-sm font-normal text-muted-foreground">{landing.pricing.full_suite.period}</span>
                       </span>
-                      <Badge variant="outline" className="text-xs">{landing.pricing.full_suite.badge}</Badge>
+                      <Badge className="text-xs">New</Badge>
                     </div>
                     <p className="font-semibold">{landing.pricing.full_suite.title}</p>
                     <p className="text-sm text-muted-foreground mt-1">{landing.pricing.full_suite.desc}</p>
                   </div>
-                  <NotifyButton />
+                  <Link href="/sign-up?redirect_url=%2Fpricing" className="shrink-0">
+                    <Button>Get started →</Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
@@ -273,7 +275,7 @@ export default function LandingPage() {
       <footer className="border-t py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Logo size={22} showName={false} />
+            <Logo size={36} />
             <span>{t("common.copyright")}</span>
           </div>
           <div className="flex gap-6">

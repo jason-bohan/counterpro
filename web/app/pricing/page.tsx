@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { NotifyButton } from "@/components/notify-button";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const checkout = async (plan: "single" | "subscription") => {
+  const checkout = async (plan: "single" | "subscription" | "suite") => {
     setLoading(plan);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -33,7 +32,7 @@ export default function PricingPage() {
     <div className="min-h-screen bg-muted/30 flex flex-col">
       <header className="border-b bg-background">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center">
-          <Logo size={28} href="/" />
+          <Logo size={44} href="/" />
         </div>
       </header>
 
@@ -122,21 +121,23 @@ export default function PricingPage() {
           </Card>
         </div>
 
-        {/* Coming Soon — Full Suite */}
+        {/* Full Negotiation Suite */}
         <div className="mt-4 max-w-2xl w-full">
-          <Card className="border-2 border-dashed border-muted-foreground/30">
+          <Card className="border-2 hover:border-primary/40 transition-colors">
             <CardContent className="py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-bold text-xl">$300<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
-                  <Badge variant="outline" className="text-xs">Coming soon</Badge>
+                  <Badge className="text-xs">New</Badge>
                 </div>
                 <p className="font-semibold">Full Negotiation Suite</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   AI manages the full back-and-forth. You approve each response before it sends from your own email. Includes thread tracking, deadline alerts, and contingency management.
                 </p>
               </div>
-              <NotifyButton />
+              <Button onClick={() => checkout("suite")} disabled={loading === "suite"} className="shrink-0">
+                {loading === "suite" ? "Redirecting..." : "Subscribe →"}
+              </Button>
             </CardContent>
           </Card>
         </div>

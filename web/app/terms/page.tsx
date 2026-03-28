@@ -6,7 +6,7 @@ export default function TermsPage() {
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-background">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Logo size={28} href="/" />
+          <Logo size={44} href="/" />
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Home</Link>
         </div>
       </header>

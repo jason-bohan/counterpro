@@ -1,26 +1,25 @@
-import Image from "next/image";
 import Link from "next/link";
 
 interface LogoProps {
   size?: number;
-  showName?: boolean;
   href?: string;
+  showName?: boolean;
 }
 
-export function Logo({ size = 32, showName = true, href }: LogoProps) {
+export function Logo({ size = 44, href, showName = true }: LogoProps) {
   const content = (
     <div className="flex items-center gap-2">
-      <Image
-        src="/android-chrome-192x192.png"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
         alt="CounterPro"
         width={size}
         height={size}
-        className="rounded-lg p-0.5 bg-white shadow-sm"
-        priority
+        className="object-contain"
       />
       {showName && (
-        <span className="font-bold tracking-tight" style={{ fontSize: size * 0.625 }}>
-          CounterPro
+        <span className="font-bold tracking-tight" style={{ fontSize: size * 0.5 }}>
+          CounterPro AI
         </span>
       )}
     </div>

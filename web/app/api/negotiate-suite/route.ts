@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
+import { getGmailToken, sendGmail as sendGmailLib } from "@/lib/gmail";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -21,6 +22,11 @@ Rules:
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
   const { negotiationId, newMessage } = await req.json();
 
@@ -74,11 +80,16 @@ export async function PUT(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
   const { messageId, approved, editedDraft } = await req.json();
 
   // Verify ownership
   const [msg] = await sql`
-    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.gmail_token, n.address
+    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email
     FROM negotiation_messages nm
     JOIN negotiations n ON n.id = nm.negotiation_id
     WHERE nm.id = ${messageId} AND n.clerk_user_id = ${userId}
@@ -87,9 +98,19 @@ export async function PUT(req: NextRequest) {
 
   const finalText = editedDraft || msg.ai_draft;
 
-  if (approved && msg.gmail_token && msg.counterparty_email) {
-    // Send via Gmail API
-    await sendGmail(msg.gmail_token, msg.counterparty_email, msg.address, finalText);
+  let sent = false;
+  if (approved && msg.counterparty_email) {
+    const gmailToken = await getGmailToken(userId);
+    if (gmailToken) {
+      try {
+        const subject = `Re: Negotiation - ${msg.address}`;
+        const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
+        sent = await sendGmailLib(userId, msg.counterparty_email, subject, finalText, fromAddress ?? undefined);
+      } catch {
+        // Gmail failure must not block approval
+        sent = false;
+      }
+    }
   }
 
   await sql`
@@ -104,16 +125,5 @@ export async function PUT(req: NextRequest) {
     VALUES (${msg.negotiation_id}, 'outbound', ${finalText}, true, NOW())
   `;
 
-  return NextResponse.json({ ok: true, sent: !!(msg.gmail_token && msg.counterparty_email) });
-}
-
-async function sendGmail(accessToken: string, to: string, address: string, body: string) {
-  const subject = `Re: Offer on ${address}`;
-  const email = [`To: ${to}`, `Subject: ${subject}`, `Content-Type: text/plain; charset=utf-8`, ``, body].join("\n");
-  const encoded = Buffer.from(email).toString("base64url");
-  await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ raw: encoded }),
-  });
+  return NextResponse.json({ ok: true, sent });
 }

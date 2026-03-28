@@ -12,12 +12,19 @@ export async function POST(req: NextRequest) {
   const email = user?.emailAddresses?.[0]?.emailAddress ?? undefined;
 
   const { plan } = await req.json();
+  const validPlans = ["subscription", "single", "suite"];
+  if (!validPlans.includes(plan)) {
+    return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+  }
+
   const priceId = plan === "subscription"
     ? process.env.STRIPE_SUBSCRIPTION_PRICE_ID!
+    : plan === "suite"
+    ? process.env.STRIPE_SUITE_PRICE_ID!
     : process.env.STRIPE_SINGLE_PRICE_ID!;
 
   const session = await stripe.checkout.sessions.create({
-    mode: plan === "subscription" ? "subscription" : "payment",
+    mode: plan === "subscription" || plan === "suite" ? "subscription" : "payment",
     payment_method_types: ["card"],
     customer_email: email,
     line_items: [{ price: priceId, quantity: 1 }],

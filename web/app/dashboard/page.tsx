@@ -22,7 +22,7 @@ type Deal = {
 };
 
 type Plan = {
-  plan: string;
+  plan: "free" | "single" | "subscription" | "suite";
   deals_remaining: number;
   subscription_end: string | null;
 };
@@ -56,7 +56,7 @@ function DashboardInner() {
       {/* Header */}
       <header className="border-b bg-background">
         <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Logo size={28} href="/" />
+          <Logo size={44} href="/" />
           <div className="flex items-center gap-3">
             {planLabel()}
             <UserButton />
@@ -149,20 +149,33 @@ function DashboardInner() {
           </Card>
         </div>
 
-        {/* Full Negotiation Suite — Coming Soon */}
+        {/* Full Negotiation Suite */}
         <Card data-section="full-suite-upsell" className="mt-4 border-2 border-dashed border-muted-foreground/30">
           <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-bold text-xl">$300<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
-                <Badge variant="outline" className="text-xs">Coming soon</Badge>
+                {plan?.plan !== "suite" && (
+                  <Badge className="text-xs">New</Badge>
+                )}
+                {plan?.plan === "suite" && (
+                  <Badge className="text-xs bg-purple-600 text-white">Active</Badge>
+                )}
               </div>
               <p className="font-semibold">Full Negotiation Suite</p>
               <p className="text-sm text-muted-foreground mt-1">
                 AI manages the full back-and-forth. You approve each response before it sends. Includes thread tracking, deadline alerts, and contingency management.
               </p>
             </div>
-            <NotifyButton />
+            {plan?.plan === "suite" ? (
+              <Link href="/negotiate" className="shrink-0">
+                <Button>Go to Suite →</Button>
+              </Link>
+            ) : (
+              <Link href="/pricing" className="shrink-0">
+                <Button variant="outline">Get started →</Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
 

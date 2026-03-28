@@ -31,6 +31,15 @@ export async function POST(req: NextRequest) {
         ON CONFLICT (clerk_user_id) DO UPDATE
         SET plan = 'subscription', subscription_end = ${subEnd.toISOString()}, updated_at = NOW()
       `;
+    } else if (plan === "suite") {
+      const subEnd = new Date();
+      subEnd.setMonth(subEnd.getMonth() + 1);
+      await sql`
+        INSERT INTO user_plans (clerk_user_id, plan, deals_remaining, subscription_end, updated_at)
+        VALUES (${clerkUserId}, 'suite', 0, ${subEnd.toISOString()}, NOW())
+        ON CONFLICT (clerk_user_id) DO UPDATE
+        SET plan = 'suite', subscription_end = ${subEnd.toISOString()}, updated_at = NOW()
+      `;
     } else {
       await sql`
         INSERT INTO user_plans (clerk_user_id, plan, deals_remaining, updated_at)

@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Nunito, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
 
-const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
+const nunito = Nunito({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+});
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -23,7 +27,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className={cn("h-full antialiased", geistSans.variable, geistMono.variable)}>
+      <html lang="en" className={cn("h-full antialiased", nunito.variable, geistMono.variable)}>
         <body className="min-h-full flex flex-col bg-background text-foreground">
           {children}
         </body>

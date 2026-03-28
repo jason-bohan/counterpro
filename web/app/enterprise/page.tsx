@@ -29,7 +29,7 @@ export default function EnterprisePage() {
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-background">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Logo size={28} href="/" />
+          <Logo size={44} href="/" />
           <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← Individual plans
           </Link>

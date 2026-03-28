@@ -1,10 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
 
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
   const threads = await sql`
     SELECT n.*,
@@ -22,13 +27,30 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { address, counterpartyEmail, dealId } = await req.json();
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
+  const { address, counterpartyEmail, dealId, role } = await req.json();
+
+  if (!address || typeof address !== "string" || address.trim() === "") {
+    return NextResponse.json({ error: "address is required" }, { status: 400 });
+  }
+
+  const validRoles = ["buyer", "seller"];
+  const resolvedRole = validRoles.includes(role) ? role : "buyer";
 
   const [thread] = await sql`
-    INSERT INTO negotiations (clerk_user_id, deal_id, address, counterparty_email)
-    VALUES (${userId}, ${dealId ?? null}, ${address}, ${counterpartyEmail ?? null})
+    INSERT INTO negotiations (clerk_user_id, deal_id, address, counterparty_email, role)
+    VALUES (${userId}, ${dealId ?? null}, ${address.trim()}, ${counterpartyEmail ?? null}, ${resolvedRole})
     RETURNING id
   `;
 
-  return NextResponse.json({ id: thread.id });
+  const aliasEmail = `sales+neg${thread.id}@counterproai.com`;
+  await sql`
+    UPDATE negotiations SET alias_email = ${aliasEmail} WHERE id = ${thread.id}
+  `;
+
+  return NextResponse.json({ id: thread.id, alias_email: aliasEmail });
 }
