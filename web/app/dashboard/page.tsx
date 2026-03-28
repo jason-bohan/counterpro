@@ -3,6 +3,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -54,11 +55,8 @@ function DashboardInner() {
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
       <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="CounterPro" width="28" height="28" />
-            <span className="font-bold text-lg">CounterPro</span>
-          </div>
+        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
+          <Logo size={28} href="/" />
           <div className="flex items-center gap-3">
             {planLabel()}
             <UserButton />
@@ -66,7 +64,7 @@ function DashboardInner() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="max-w-7xl mx-auto px-8 py-10">
         {paymentSuccess && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 font-medium">
             ✓ Payment successful! You&apos;re all set — start your negotiation below.

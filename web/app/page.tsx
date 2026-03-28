@@ -5,22 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { NotifyButton } from "@/components/notify-button";
+import { Logo } from "@/components/logo";
 import { t, getMessages } from "@/lib/i18n";
 
 const messages = getMessages();
-
-function Logo() {
-  return (
-    <div className="flex items-center gap-2">
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-        <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-        <path d="M19 20h3v3h-3v-3z" fill="white" opacity="0.6"/>
-      </svg>
-      <span className="font-bold text-xl tracking-tight">{t("common.brand")}</span>
-    </div>
-  );
-}
 
 export default function LandingPage() {
   const { landing } = messages;
@@ -179,6 +167,9 @@ export default function LandingPage() {
                   <Link href="/sign-up?redirect_url=%2Fdeal" className="block pt-2">
                     <Button className="w-full">{landing.pricing.single.cta}</Button>
                   </Link>
+                  <Link href="/sign-up?redirect_url=%2Fdashboard" className="block text-center text-xs text-muted-foreground hover:text-foreground transition-colors pt-1">
+                    Have a promo code? Sign up to redeem →
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -282,10 +273,7 @@ export default function LandingPage() {
       <footer className="border-t py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-              <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-            </svg>
+            <Logo size={22} showName={false} />
             <span>{t("common.copyright")}</span>
           </div>
           <div className="flex gap-6">

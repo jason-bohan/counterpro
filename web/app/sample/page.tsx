@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,13 +130,7 @@ export default function SamplePage() {
       {/* Header */}
       <header className="border-b bg-background print:hidden">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-              <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-            </svg>
-            <span className="font-bold text-lg">CounterPro</span>
-          </Link>
+          <Logo size={28} href="/" />
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="text-xs">Sample deal</Badge>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +29,7 @@ export default function EnterprisePage() {
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-background">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-              <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-            </svg>
-            <span className="font-bold text-lg">CounterPro</span>
-          </Link>
+          <Logo size={28} href="/" />
           <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← Individual plans
           </Link>

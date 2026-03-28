@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/logo";
 
 export default function PricingPage() {
   const router = useRouter();
@@ -32,13 +33,7 @@ export default function PricingPage() {
     <div className="min-h-screen bg-muted/30 flex flex-col">
       <header className="border-b bg-background">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center">
-          <Link href="/" className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="currentColor" className="text-primary"/>
-              <path d="M16 5L5 14h3v13h8v-8h4v8h4V14h3L16 5z" fill="white"/>
-            </svg>
-            <span className="font-bold text-lg">CounterPro</span>
-          </Link>
+          <Logo size={28} href="/" />
         </div>
       </header>
 
