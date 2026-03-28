@@ -13,6 +13,8 @@ type PromoCode = { code: string; deals_granted: number; uses_remaining: number; 
 type Inquiry = { id: number; name: string; email: string; company: string; agents: string; message: string; created_at: string };
 type WaitlistEntry = { id: number; email: string; created_at: string };
 type UserPlan = { clerk_user_id: string; plan: string; deals_remaining: number; subscription_end: string | null; updated_at: string };
+type GmailState = { history_id: string | null; watch_expiration: string | null; watch_email: string | null; updated_at: string };
+type GmailToken = { clerk_user_id: string; expires_at: string | null; updated_at: string };
 
 export default function AdminPage() {
   const [data, setData] = useState<{
@@ -20,6 +22,8 @@ export default function AdminPage() {
     inquiries: Inquiry[];
     waitlist: WaitlistEntry[];
     recentPlans: UserPlan[];
+    gmailState: GmailState | null;
+    gmailTokens: GmailToken[];
   } | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,7 +39,15 @@ export default function AdminPage() {
   const [grantCredits, setGrantCredits] = useState("1");
   const [grantMsg, setGrantMsg] = useState("");
 
-  const [activeTab, setActiveTab] = useState<"promos" | "inquiries" | "waitlist" | "users">("promos");
+  // Grant suite state
+  const [suiteUserId, setSuiteUserId] = useState("");
+  const [suiteMsg, setSuiteMsg] = useState("");
+
+  // Gmail watch state
+  const [watchLoading, setWatchLoading] = useState(false);
+  const [watchMsg, setWatchMsg] = useState("");
+
+  const [activeTab, setActiveTab] = useState<"promos" | "inquiries" | "waitlist" | "users" | "email">("promos");
 
   const load = async () => {
     const res = await fetch("/api/admin");
@@ -76,6 +88,33 @@ export default function AdminPage() {
     setGrantUserId(""); load();
   };
 
+  const grantSuite = async () => {
+    if (!suiteUserId.trim()) return;
+    const r = await api({ action: "grant_suite", clerk_user_id: suiteUserId });
+    setSuiteMsg(r.ok ? `✓ Suite plan granted to ${suiteUserId}` : r.error);
+    setSuiteUserId(""); load();
+  };
+
+  const activateWatch = async () => {
+    setWatchLoading(true); setWatchMsg("");
+    const res = await fetch("/api/negotiate-suite/gmail-watch", { method: "POST" });
+    const d = await res.json();
+    if (d.ok) {
+      setWatchMsg(`✓ Watch active — expires ${new Date(Number(d.expiration)).toLocaleString()}`);
+    } else {
+      const detail = d.detail ? ` — ${typeof d.detail === "string" ? d.detail.slice(0, 200) : JSON.stringify(d.detail).slice(0, 200)}` : "";
+      setWatchMsg(`Error: ${d.error}${detail}`);
+    }
+    setWatchLoading(false); load();
+  };
+
+  const stopWatch = async () => {
+    setWatchLoading(true); setWatchMsg("");
+    const r = await api({ action: "gmail_watch_stop" });
+    setWatchMsg(r.ok ? "Watch record cleared." : r.error);
+    setWatchLoading(false); load();
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (forbidden) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-6">
@@ -90,6 +129,7 @@ export default function AdminPage() {
     { id: "inquiries", label: "Enterprise Inquiries", count: data?.inquiries.length },
     { id: "waitlist", label: "Waitlist", count: data?.waitlist.length },
     { id: "users", label: "Grant Credits", count: null },
+    { id: "email", label: "Email Bot", count: null },
   ] as const;
 
   return (
@@ -254,6 +294,112 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Email Bot */}
+        {activeTab === "email" && (() => {
+          const gs = data?.gmailState ?? null;
+          const expiry = gs?.watch_expiration ? new Date(gs.watch_expiration) : null;
+          const isActive = expiry !== null && expiry > new Date();
+          const expiresIn = expiry ? Math.round((expiry.getTime() - Date.now()) / 1000 / 60 / 60) : 0;
+          return (
+            <div className="space-y-6">
+              {/* Watch status card */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Gmail Push Watch</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isActive ? "bg-green-500" : "bg-gray-300"}`} />
+                      <span className="font-medium text-sm">{isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    {gs?.watch_email && (
+                      <span className="text-sm text-muted-foreground font-mono">{gs.watch_email}</span>
+                    )}
+                    {isActive && expiry && (
+                      <Badge variant="outline" className="text-xs">
+                        Expires in ~{expiresIn}h ({expiry.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })})
+                      </Badge>
+                    )}
+                    {!isActive && gs?.watch_expiration && (
+                      <Badge variant="secondary" className="text-xs">
+                        Expired {new Date(gs.watch_expiration).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </Badge>
+                    )}
+                  </div>
+                  {gs?.history_id && (
+                    <p className="text-xs text-muted-foreground">History ID: {gs.history_id} · Last updated {gs.updated_at ? new Date(gs.updated_at).toLocaleString() : "—"}</p>
+                  )}
+                  <div className="flex gap-3 flex-wrap">
+                    <Button onClick={activateWatch} disabled={watchLoading}>
+                      {watchLoading ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Working...
+                        </span>
+                      ) : isActive ? "Renew watch" : "Activate watch"}
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" onClick={() => { window.location.href = "/api/auth/gmail"; }}>
+                        {data?.gmailTokens.length ? "Reconnect Gmail" : "Connect Gmail →"}
+                      </Button>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <span className={`w-2 h-2 rounded-full ${data?.gmailTokens.length ? "bg-green-500" : "bg-red-400"}`} />
+                        <span className="text-muted-foreground">{data?.gmailTokens.length ? "Connected" : "Not connected"}</span>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <Button variant="ghost" onClick={stopWatch} disabled={watchLoading}>
+                        Clear record
+                      </Button>
+                    )}
+                  </div>
+                  {watchMsg && <p className={`text-sm ${watchMsg.startsWith("✓") ? "text-green-600" : "text-destructive"}`}>{watchMsg}</p>}
+                </CardContent>
+              </Card>
+
+              {/* OAuth tokens */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Gmail OAuth Tokens</CardTitle></CardHeader>
+                <CardContent>
+                  {!data?.gmailTokens.length ? (
+                    <p className="text-sm text-muted-foreground">No Gmail tokens stored. Connect Gmail via /api/auth/gmail first.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {data.gmailTokens.map(t => {
+                        const tokenExpiry = t.expires_at ? new Date(t.expires_at) : null;
+                        const tokenOk = tokenExpiry ? tokenExpiry > new Date() : true;
+                        return (
+                          <div key={t.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                            <span className="font-mono text-xs text-muted-foreground truncate max-w-xs">{t.clerk_user_id}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`w-2 h-2 rounded-full ${tokenOk ? "bg-green-500" : "bg-red-400"}`} />
+                              <span className="text-xs text-muted-foreground">
+                                {tokenExpiry ? `Expires ${tokenExpiry.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No expiry"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Grant suite */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Grant Suite plan</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">Manually grant suite access to a user (bypasses Stripe).</p>
+                  <div className="flex gap-3">
+                    <Input placeholder="user_2abc..." value={suiteUserId} onChange={e => setSuiteUserId(e.target.value)} className="max-w-xs" />
+                    <Button onClick={grantSuite} disabled={!suiteUserId.trim()}>Grant Suite</Button>
+                  </div>
+                  {suiteMsg && <p className="text-sm text-green-600">{suiteMsg}</p>}
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()}
 
         {/* Grant Credits */}
         {activeTab === "users" && (

@@ -215,8 +215,8 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     ORDER BY created_at ASC
   `;
 
-  const history = messages
-    .map((m: { direction: string; content: string }) =>
+  const history = (messages as Array<{ direction: string; content: string }>)
+    .map((m) =>
       `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`
     )
     .join("\n\n");

@@ -45,15 +45,19 @@ export async function GET() {
 
   await ensureTables();
 
-  const [promoCodes, redemptions, inquiries, waitlist, recentPlans] = await Promise.all([
+  const [promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailStateRows, gmailTokenRows] = await Promise.all([
     sql`SELECT * FROM promo_codes ORDER BY created_at DESC`,
     sql`SELECT r.*, p.code as promo_code FROM promo_redemptions r JOIN promo_codes p ON r.code = p.code ORDER BY r.redeemed_at DESC LIMIT 50`,
     sql`SELECT * FROM enterprise_inquiries ORDER BY created_at DESC`,
     sql`SELECT * FROM waitlist ORDER BY created_at DESC`,
     sql`SELECT * FROM user_plans ORDER BY updated_at DESC LIMIT 50`,
+    sql`SELECT * FROM gmail_state WHERE id = 1`,
+    sql`SELECT clerk_user_id, expires_at, updated_at FROM user_gmail_tokens LIMIT 10`,
   ]);
 
-  return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans });
+  const gmailState = gmailStateRows[0] ?? null;
+
+  return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailState, gmailTokens: gmailTokenRows });
 }
 
 // POST — create promo code
@@ -99,6 +103,23 @@ export async function POST(req: Request) {
       SET deals_remaining = user_plans.deals_remaining + ${data.credits},
           plan = CASE WHEN user_plans.plan = 'free' THEN 'single' ELSE user_plans.plan END,
           updated_at = NOW()
+    `;
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "grant_suite") {
+    await sql`
+      INSERT INTO user_plans (clerk_user_id, plan, deals_remaining)
+      VALUES (${data.clerk_user_id}, 'suite', 0)
+      ON CONFLICT (clerk_user_id) DO UPDATE
+      SET plan = 'suite', updated_at = NOW()
+    `;
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "gmail_watch_stop") {
+    await sql`
+      UPDATE gmail_state SET watch_expiration = NULL, updated_at = NOW() WHERE id = 1
     `;
     return NextResponse.json({ ok: true });
   }

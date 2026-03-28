@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { getGmailToken, refreshGmailToken } from "@/lib/gmail";
+import { sql } from "@/lib/db";
 
 async function getAccessToken(userId: string): Promise<string | null> {
   let token = await getGmailToken(userId);
@@ -56,6 +57,19 @@ export async function POST() {
   }
 
   const data = await res.json();
+
+  // Persist watch expiration so admin can see status
+  const expiresAt = data.expiration ? new Date(Number(data.expiration)) : null;
+  await sql`
+    INSERT INTO gmail_state (id, history_id, watch_expiration, watch_email, updated_at)
+    VALUES (1, ${data.historyId ?? null}, ${expiresAt?.toISOString() ?? null}, ${gmailUser}, NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      history_id = EXCLUDED.history_id,
+      watch_expiration = EXCLUDED.watch_expiration,
+      watch_email = EXCLUDED.watch_email,
+      updated_at = NOW()
+  `;
+
   return NextResponse.json({ ok: true, expiration: data.expiration, historyId: data.historyId });
 }
 

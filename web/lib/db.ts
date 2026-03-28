@@ -97,6 +97,9 @@ export async function setupDatabase() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
+  await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`;
 }
 
 export async function getUserPlan(clerkUserId: string) {
