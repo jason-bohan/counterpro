@@ -80,7 +80,7 @@ export default function LandingPage() {
                 Get a tailored counter-offer strategy, ready-to-send email scripts, and word-for-word
                 verbal scripts — powered by AI. One deal could save you $10,000–$30,000.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <Link href="/sign-up?redirect_url=%2Fdeal">
                   <Button size="lg" className="px-8 text-base h-12">Negotiate my deal — $50</Button>
                 </Link>
@@ -88,6 +88,9 @@ export default function LandingPage() {
                   <Button size="lg" variant="outline" className="px-8 text-base h-12">Unlimited — $100/mo</Button>
                 </Link>
               </div>
+              <Link href="/sample" className="text-sm text-primary underline underline-offset-2 hover:opacity-80 transition-opacity">
+                See a sample package first →
+              </Link>
               <p className="text-sm text-muted-foreground">
                 Takes 2 minutes. No agent. No commission.
               </p>
