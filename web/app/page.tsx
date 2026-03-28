@@ -49,6 +49,9 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Logo />
           <nav className="flex items-center gap-4">
+            <Link href="/enterprise" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+              Enterprise
+            </Link>
             <Show when="signed-out">
               <Link href="/sign-in">
                 <Button variant="ghost" size="sm">Sign in</Button>
