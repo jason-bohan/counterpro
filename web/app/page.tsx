@@ -183,7 +183,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold text-center mb-4">Simple pricing</h2>
             <p className="text-muted-foreground text-center mb-12">Pay per deal or subscribe for unlimited access</p>
-            <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto pt-4">
+            <div className="grid md:grid-cols-3 gap-6 pt-4">
               <Card className="border-2 hover:border-primary/40 transition-colors">
                 <CardHeader>
                   <Badge variant="outline" className="w-fit mb-2">Single deal</Badge>
@@ -221,28 +221,27 @@ export default function LandingPage() {
                     <li>✓ Best for investors & agents</li>
                   </ul>
                   <Link href="/sign-up?redirect_url=%2Fdeal" className="block pt-2">
-                    <Button className="w-full" variant="default">Subscribe</Button>
+                    <Button className="w-full">Subscribe</Button>
                   </Link>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* Enterprise */}
-            <div className="mt-6 max-w-2xl mx-auto">
               <Card className="border-2 hover:border-primary/40 transition-colors">
-                <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-xl">$1,000<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
-                      <Badge variant="outline" className="text-xs">Enterprise</Badge>
-                    </div>
-                    <p className="font-semibold">Team Plan for Brokerages</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Seat-based plan for brokerages and teams. Unlimited deals per agent, admin dashboard, brokerage branding.
-                    </p>
-                  </div>
-                  <Link href="/enterprise" className="shrink-0">
-                    <Button variant="outline">Learn more →</Button>
+                <CardHeader>
+                  <Badge variant="outline" className="w-fit mb-2">Enterprise</Badge>
+                  <CardTitle className="text-4xl font-bold">$1,000<span className="text-lg font-normal text-muted-foreground">/mo</span></CardTitle>
+                  <p className="text-muted-foreground text-sm">Seat-based for teams</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ul className="text-sm space-y-2 text-muted-foreground">
+                    <li>✓ Up to 10 agent seats</li>
+                    <li>✓ Unlimited deals per agent</li>
+                    <li>✓ Admin dashboard</li>
+                    <li>✓ Brokerage branding</li>
+                    <li>✓ Priority support</li>
+                  </ul>
+                  <Link href="/enterprise" className="block pt-2">
+                    <Button className="w-full" variant="outline">Contact us</Button>
                   </Link>
                 </CardContent>
               </Card>
