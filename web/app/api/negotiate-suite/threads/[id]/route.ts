@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       status = COALESCE(${status ?? null}, status),
       counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
-      autonomous_mode = CASE WHEN ${autonomous_mode ?? null} IS NOT NULL THEN ${autonomous_mode ?? false} ELSE autonomous_mode END,
+      autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
     RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, updated_at
