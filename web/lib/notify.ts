@@ -29,6 +29,33 @@ ${preview}...
   await sendGmail(gmailUserId, toEmail, subject, body, from);
 }
 
+export async function sendAutonomousUpdateEmail(
+  toEmail: string,
+  address: string,
+  negotiationId: number,
+  sentPreview: string
+): Promise<void> {
+  const gmailUserId = process.env.GMAIL_SYSTEM_USER_ID;
+  if (!gmailUserId) return;
+
+  const subject = `CounterPro auto-replied on your behalf — ${address}`;
+  const preview = sentPreview.slice(0, 300);
+  const body = `CounterPro received a message and automatically sent a reply in your negotiation for ${address}.
+
+What was sent:
+${preview}${sentPreview.length > 300 ? "..." : ""}
+
+To review the full thread or turn off auto-pilot, visit:
+https://counterproai.com/negotiate/${negotiationId}
+
+Turn off auto-pilot any time from the sidebar to review the next response yourself.
+
+— CounterPro`;
+
+  const from = process.env.GMAIL_SALES_ADDRESS || "sales@counterproai.com";
+  await sendGmail(gmailUserId, toEmail, subject, body, from);
+}
+
 export async function getClerkUserEmail(clerkUserId: string): Promise<string | null> {
   const clerkSecretKey = process.env.CLERK_SECRET_KEY;
   if (!clerkSecretKey) {

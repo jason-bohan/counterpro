@@ -86,6 +86,14 @@ export default function NegotiateThreadPage() {
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
 
+  // First contact
+  const [showFirstContact, setShowFirstContact] = useState(false);
+  const [researching, setResearching] = useState(false);
+  const [research, setResearch] = useState<{ market_value_low: number; market_value_high: number; suggested_offer: number; reasoning: string } | null>(null);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [offerNotes, setOfferNotes] = useState("");
+  const [generatingFirst, setGeneratingFirst] = useState(false);
+
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [dlLabel, setDlLabel] = useState("");
@@ -197,6 +205,38 @@ export default function NegotiateThreadPage() {
       load();
     } finally {
       setSavingDeadline(false);
+    }
+  };
+
+  const runMarketResearch = async () => {
+    setResearching(true);
+    try {
+      const res = await fetch(`/api/negotiate-suite/threads/${id}/research`);
+      const data = await res.json();
+      setResearch(data);
+      setOfferAmount(String(data.suggested_offer ?? ""));
+    } finally {
+      setResearching(false);
+    }
+  };
+
+  const generateFirstContact = async () => {
+    const amount = parseInt(offerAmount.replace(/[^0-9]/g, ""), 10);
+    if (!amount) return;
+    setGeneratingFirst(true);
+    try {
+      const res = await fetch(`/api/negotiate-suite/threads/${id}/first-contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerAmount: amount, notes: offerNotes || undefined }),
+      });
+      const { draft, messageId } = await res.json();
+      setPendingDraft({ draft, messageId });
+      setEditedDraft(draft);
+      setShowFirstContact(false);
+      load();
+    } finally {
+      setGeneratingFirst(false);
     }
   };
 
@@ -319,12 +359,101 @@ export default function NegotiateThreadPage() {
             {/* Message thread */}
             <div className="flex flex-col gap-3">
               {messages.length === 0 && !pendingDraft && (
-                <div className="text-center text-muted-foreground text-sm py-10">
-                  No messages yet. Paste the counterparty&apos;s first message below to get started.
+                <div className="text-center text-muted-foreground text-sm py-6 space-y-3">
+                  <p>No messages yet.</p>
+                  {negotiation.counterparty_email && !showFirstContact && (
+                    <button
+                      onClick={() => { setShowFirstContact(true); runMarketResearch(); }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      Generate opening offer →
+                    </button>
+                  )}
+                  {!negotiation.counterparty_email && (
+                    <p className="text-xs">Add the counterparty&apos;s email in the sidebar to send an opening offer, or paste their message below.</p>
+                  )}
                 </div>
               )}
 
-              {messages.map(m => (
+              {/* First contact panel */}
+              {showFirstContact && !pendingDraft && (
+                <Card className="border-2 border-primary">
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-base">Generate opening offer</CardTitle>
+                    <p className="text-sm text-muted-foreground">AI researches the market and drafts your first message.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Market research result */}
+                    {researching && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Researching market value for {negotiation.address}...
+                      </div>
+                    )}
+                    {research && !researching && (
+                      <div className="rounded-lg bg-muted/60 px-4 py-3 space-y-1">
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">AI Market Estimate</p>
+                        <p className="text-sm font-semibold">
+                          ${research.market_value_low.toLocaleString()} – ${research.market_value_high.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{research.reasoning}</p>
+                      </div>
+                    )}
+
+                    {/* Offer amount */}
+                    <div className="space-y-1">
+                      <Label className="text-sm">
+                        {negotiation.role === "seller" ? "Asking price" : "Your opening offer"}
+                        {research && (
+                          <span className="ml-2 text-xs text-muted-foreground font-normal">
+                            (AI suggests ${research.suggested_offer.toLocaleString()})
+                          </span>
+                        )}
+                      </Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                        <Input
+                          className="pl-7"
+                          placeholder="e.g. 450000"
+                          value={offerAmount}
+                          onChange={e => setOfferAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Optional notes */}
+                    <div className="space-y-1">
+                      <Label className="text-sm">
+                        Any context for the AI? <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        placeholder="e.g. flexible on closing date, cash buyer, seen the property twice"
+                        value={offerNotes}
+                        onChange={e => setOfferNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={generateFirstContact}
+                        disabled={generatingFirst || !offerAmount || researching}
+                      >
+                        {generatingFirst ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Drafting...
+                          </span>
+                        ) : "Draft opening message →"}
+                      </Button>
+                      <Button variant="ghost" onClick={() => { setShowFirstContact(false); setResearch(null); setOfferAmount(""); setOfferNotes(""); }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {messages.filter(m => m.content !== "[First contact]").map(m => (
                 <div
                   key={m.id}
                   className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}

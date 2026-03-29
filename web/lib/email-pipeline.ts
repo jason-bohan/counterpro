@@ -97,6 +97,47 @@ export function routeInboundEmail(from: string, to: string): InboundRouting {
   return { type: "negotiation", negotiationId };
 }
 
+// ── First contact prompt builders ─────────────────────────────────────────
+
+export function buildMarketResearchPrompt(address: string): string {
+  return `You are a real estate market analyst. Analyze this property: ${address}
+
+Based on the location and typical market conditions for this area, provide a JSON response with:
+- Estimated fair market value range
+- Suggested opening offer for a buyer (typically 3-8% below market to leave negotiation room)
+- One sentence of reasoning
+
+Respond ONLY with this exact JSON format, no other text:
+{
+  "market_value_low": 450000,
+  "market_value_high": 480000,
+  "suggested_offer": 435000,
+  "reasoning": "Comparable homes in this area have sold for..."
+}`;
+}
+
+export function buildFirstContactPrompt(
+  address: string,
+  role: "buyer" | "seller" | string,
+  offerAmount: number,
+  notes?: string
+): string {
+  const isBuyer = role === "buyer";
+  return `You are CounterPro, helping a real estate ${role} initiate contact about the property at: ${address}
+
+${isBuyer ? `Buyer's opening offer: $${offerAmount.toLocaleString()}` : `Seller's asking price: $${offerAmount.toLocaleString()}`}
+${notes ? `Additional context: ${notes}` : ""}
+
+Draft a professional first contact email that:
+- ${isBuyer ? "Expresses genuine, serious interest in the property" : "Presents the property as an attractive opportunity"}
+- States the ${isBuyer ? "offer" : "asking price"} confidently with brief market justification
+- ${isBuyer ? "Shows flexibility on timeline/terms to compensate for the price" : "Highlights the property's strengths and favorable terms"}
+- Creates mild urgency without being aggressive
+- Ends with a clear, specific next step
+- Is concise — 3 to 4 short paragraphs
+- Do NOT include a subject line — just the email body`;
+}
+
 // ── AI prompt builder ──────────────────────────────────────────────────────
 
 export function buildNegotiationPrompt(
