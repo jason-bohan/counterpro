@@ -1,10 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/deal(.*)', '/negotiate(.*)', '/admin(.*)'])
-const isWebhook = createRouteMatcher(['/api/stripe/webhook'])
+const isPublicApi = createRouteMatcher(['/api/stripe/(.*)', '/api/webhooks/(.*)', '/api/cron/(.*)'])
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isWebhook(req)) return // skip Clerk entirely for Stripe webhooks
+  if (isPublicApi(req)) return // skip Clerk for webhooks, cron, and Stripe
   if (isProtectedRoute(req)) await auth.protect()
 })
 
