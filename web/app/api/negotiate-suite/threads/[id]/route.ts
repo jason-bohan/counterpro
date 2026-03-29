@@ -21,7 +21,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY created_at ASC
   `;
 
-  return NextResponse.json({ negotiation: neg, messages });
+  const deadlines = await sql`
+    SELECT id, label, due_date, completed
+    FROM negotiation_deadlines
+    WHERE negotiation_id = ${id}
+    ORDER BY due_date ASC
+  `;
+
+  return NextResponse.json({ negotiation: neg, messages, deadlines });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -42,11 +49,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { status, counterparty_email, deadline_date } = body;
+  const { status, counterparty_email, deadline_date, autonomous_mode } = body;
 
   const validStatuses = ["active", "pending", "closed", "won", "lost"];
   if (status !== undefined && !validStatuses.includes(status)) {
     return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+  }
+
+  if (autonomous_mode !== undefined && typeof autonomous_mode !== "boolean") {
+    return NextResponse.json({ error: "autonomous_mode must be a boolean" }, { status: 400 });
   }
 
   let parsedDeadline: string | null = null;
@@ -64,9 +75,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       status = COALESCE(${status ?? null}, status),
       counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
+      autonomous_mode = CASE WHEN ${autonomous_mode ?? null} IS NOT NULL THEN ${autonomous_mode ?? false} ELSE autonomous_mode END,
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
-    RETURNING id, status, counterparty_email, deadline_date, updated_at
+    RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, updated_at
   `;
 
   return NextResponse.json({ ok: true, negotiation: updated });

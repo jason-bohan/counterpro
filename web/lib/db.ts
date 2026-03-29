@@ -55,6 +55,7 @@ export async function setupDatabase() {
   await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS contingencies JSONB DEFAULT '[]'`;
   await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
   await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS alias_email TEXT`;
+  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS autonomous_mode BOOLEAN NOT NULL DEFAULT FALSE`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS negotiation_messages (
@@ -100,6 +101,17 @@ export async function setupDatabase() {
 
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS webhook_logs (
+      id SERIAL PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      detail TEXT,
+      status TEXT NOT NULL DEFAULT 'ok',
+      error TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }
 
 export async function getUserPlan(clerkUserId: string) {
@@ -164,6 +176,17 @@ export async function decrementDealCredit(clerkUserId: string) {
     SET deals_remaining = deals_remaining - 1, updated_at = NOW()
     WHERE clerk_user_id = ${clerkUserId} AND deals_remaining > 0
   `;
+}
+
+/** Returns the negotiation row if it exists and belongs to the user, otherwise null. */
+export async function verifyNegotiationOwnership(
+  userId: string,
+  negotiationId: number
+) {
+  const rows = await sql`
+    SELECT * FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
+  `;
+  return rows[0] ?? null;
 }
 
 export async function canUserRunSuite(userId: string): Promise<boolean> {

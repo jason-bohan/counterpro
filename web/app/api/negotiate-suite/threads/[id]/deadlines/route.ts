@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { sql, setupDatabase } from "@/lib/db";
+import { sql, setupDatabase, verifyNegotiationOwnership } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -15,9 +15,9 @@ export async function GET(
   const negotiationId = parseInt(id, 10);
   if (isNaN(negotiationId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  // Verify ownership
-  const [neg] = await sql`SELECT id FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}`;
-  if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await verifyNegotiationOwnership(userId, negotiationId)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const deadlines = await sql`
     SELECT id, label, due_date, completed
@@ -43,8 +43,9 @@ export async function POST(
   if (isNaN(negotiationId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   // Verify ownership
-  const [neg] = await sql`SELECT id FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}`;
-  if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await verifyNegotiationOwnership(userId, negotiationId)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const body = await req.json();
   const { label, due_date } = body;
@@ -81,8 +82,9 @@ export async function PATCH(
   if (isNaN(negotiationId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   // Verify ownership
-  const [neg] = await sql`SELECT id FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}`;
-  if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await verifyNegotiationOwnership(userId, negotiationId)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const body = await req.json();
   const { id: deadlineId, completed } = body;

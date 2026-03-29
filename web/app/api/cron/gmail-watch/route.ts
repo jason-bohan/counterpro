@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql, setupDatabase } from "@/lib/db";
-import { getGmailToken, refreshGmailToken } from "@/lib/gmail";
+import { getAccessToken } from "@/lib/gmail";
 
 // GET — called by Vercel cron every 6 days to renew the Gmail watch (expires every 7 days)
 // Vercel cron config (add to vercel.json):
@@ -32,17 +32,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "GMAIL_SYSTEM_USER_ID not set" }, { status: 500 });
   }
 
-  let token = await getGmailToken(systemUserId);
-  if (!token) {
+  const accessToken = await getAccessToken(systemUserId);
+  if (!accessToken) {
     return NextResponse.json({ error: "No Gmail token found for system user" }, { status: 400 });
-  }
-
-  const needsRefresh =
-    token.expires_at !== null && token.expires_at.getTime() - Date.now() < 5 * 60 * 1000;
-  let accessToken = token.access_token;
-  if (needsRefresh) {
-    const refreshed = await refreshGmailToken(systemUserId);
-    if (refreshed) accessToken = refreshed;
   }
 
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/watch`, {

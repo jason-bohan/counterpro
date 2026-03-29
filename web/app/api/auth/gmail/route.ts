@@ -1,11 +1,12 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const state = Buffer.from(user.id).toString("base64");
+  const returnTo = req.nextUrl.searchParams.get("returnTo") ?? "/negotiate";
+  const state = Buffer.from(JSON.stringify({ userId: user.id, returnTo })).toString("base64");
 
   const redirectUri = `${process.env.GOOGLE_REDIRECT_URI}/api/auth/gmail/callback`;
 

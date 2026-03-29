@@ -27,6 +27,19 @@ export async function getGmailToken(userId: string): Promise<{ access_token: str
   };
 }
 
+/** Get a valid access token for a user, refreshing automatically if needed. */
+export async function getAccessToken(userId: string): Promise<string | null> {
+  const token = await getGmailToken(userId);
+  if (!token) return null;
+  const needsRefresh =
+    token.expires_at !== null && token.expires_at.getTime() - Date.now() < 5 * 60 * 1000;
+  if (needsRefresh) {
+    const refreshed = await refreshGmailToken(userId);
+    if (refreshed) return refreshed;
+  }
+  return token.access_token;
+}
+
 export async function refreshGmailToken(userId: string): Promise<string | null> {
   const token = await getGmailToken(userId);
   if (!token?.refresh_token) return null;
@@ -63,10 +76,14 @@ export async function sendGmail(
   to: string,
   subject: string,
   body: string,
-  from?: string
+  from?: string,
+  replyTo?: string
 ): Promise<boolean> {
   let token = await getGmailToken(userId);
-  if (!token) return false;
+  if (!token) {
+    console.error(`[sendGmail] No Gmail token found for user=${userId}`);
+    return false;
+  }
 
   // Refresh if expired or within 5 minutes of expiry
   const needsRefresh =
@@ -86,8 +103,11 @@ export async function sendGmail(
   if (from) {
     emailLines.push(`From: ${from}`);
   }
+  emailLines.push(`To: ${to}`);
+  if (replyTo) {
+    emailLines.push(`Reply-To: ${replyTo}`);
+  }
   emailLines.push(
-    `To: ${to}`,
     `Subject: ${encodedSubject}`,
     `Content-Type: text/plain; charset=utf-8`,
     `Content-Transfer-Encoding: quoted-printable`,
@@ -105,5 +125,11 @@ export async function sendGmail(
     body: JSON.stringify({ raw }),
   });
 
-  return res.ok;
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "(unreadable)");
+    console.error(`[sendGmail] Gmail API error ${res.status} for user=${userId} to=${to}: ${errBody}`);
+    return false;
+  }
+
+  return true;
 }

@@ -1,19 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { getGmailToken, refreshGmailToken } from "@/lib/gmail";
+import { getAccessToken } from "@/lib/gmail";
 import { sql } from "@/lib/db";
-
-async function getAccessToken(userId: string): Promise<string | null> {
-  let token = await getGmailToken(userId);
-  if (!token) return null;
-  const needsRefresh =
-    token.expires_at !== null && token.expires_at.getTime() - Date.now() < 5 * 60 * 1000;
-  if (needsRefresh) {
-    const refreshed = await refreshGmailToken(userId);
-    if (refreshed) return refreshed;
-  }
-  return token.access_token;
-}
 
 // POST — set up (or renew) Gmail push watch
 export async function POST() {

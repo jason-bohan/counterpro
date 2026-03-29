@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
+import { generateAliasEmail } from "@/lib/constants";
 
 export async function GET() {
   const { userId } = await auth();
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     RETURNING id
   `;
 
-  const aliasEmail = `sales+neg${thread.id}@counterproai.com`;
+  const aliasEmail = generateAliasEmail(thread.id);
   await sql`
     UPDATE negotiations SET alias_email = ${aliasEmail} WHERE id = ${thread.id}
   `;

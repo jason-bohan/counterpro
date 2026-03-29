@@ -36,6 +36,7 @@ type Negotiation = {
   alias_email: string | null;
   status: string;
   created_at: string;
+  autonomous_mode: boolean;
   gmail_token?: string | null;
 };
 
@@ -82,6 +83,9 @@ export default function NegotiateThreadPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [aliasCopied, setAliasCopied] = useState(false);
 
+  // Autonomous mode
+  const [togglingAuto, setTogglingAuto] = useState(false);
+
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [dlLabel, setDlLabel] = useState("");
@@ -102,6 +106,14 @@ export default function NegotiateThreadPage() {
         setMessages(d.messages ?? []);
         setDeadlines(d.deadlines ?? []);
         setEmailValue(d.negotiation?.counterparty_email ?? "");
+        // Restore pending draft from DB if one exists and hasn't been approved
+        const pending = (d.messages ?? []).find(
+          (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
+        );
+        if (pending) {
+          setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
+          setEditedDraft(pending.ai_draft!);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -188,6 +200,22 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const toggleAutonomousMode = async () => {
+    if (!negotiation) return;
+    setTogglingAuto(true);
+    const next = !negotiation.autonomous_mode;
+    try {
+      await fetch(`/api/negotiate-suite/threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autonomous_mode: next }),
+      });
+      setNegotiation({ ...negotiation, autonomous_mode: next });
+    } finally {
+      setTogglingAuto(false);
+    }
+  };
+
   const toggleDeadline = async (dlId: number, completed: boolean) => {
     await fetch(`/api/negotiate-suite/threads/${id}/deadlines`, {
       method: "PATCH",
@@ -257,16 +285,23 @@ export default function NegotiateThreadPage() {
               <Badge variant="secondary" className="text-xs capitalize shrink-0">{negotiation.role}</Badge>
             </div>
           </div>
-          <Badge
-            className={`text-xs shrink-0 ${
-              negotiation.status === "active"
-                ? "bg-green-100 text-green-800 border border-green-200"
-                : "bg-muted text-muted-foreground"
-            }`}
-            variant="outline"
-          >
-            {negotiation.status === "active" ? "Active" : "Closed"}
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {negotiation.autonomous_mode && (
+              <Badge className="text-xs bg-violet-100 text-violet-800 border border-violet-200" variant="outline">
+                Auto-pilot ON
+              </Badge>
+            )}
+            <Badge
+              className={`text-xs ${
+                negotiation.status === "active"
+                  ? "bg-green-100 text-green-800 border border-green-200"
+                  : "bg-muted text-muted-foreground"
+              }`}
+              variant="outline"
+            >
+              {negotiation.status === "active" ? "Active" : "Closed"}
+            </Badge>
+          </div>
         </div>
       </header>
 
@@ -505,6 +540,37 @@ export default function NegotiateThreadPage() {
                         Edit
                       </button>
                     </div>
+                  )}
+                </div>
+                {/* Autonomous mode toggle */}
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium leading-tight">Auto-pilot mode</p>
+                      <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                        AI replies automatically without your approval
+                      </p>
+                    </div>
+                    <button
+                      onClick={toggleAutonomousMode}
+                      disabled={togglingAuto}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none disabled:opacity-50 ${
+                        negotiation.autonomous_mode ? "bg-violet-600" : "bg-muted-foreground/30"
+                      }`}
+                      role="switch"
+                      aria-checked={negotiation.autonomous_mode}
+                    >
+                      <span
+                        className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                          negotiation.autonomous_mode ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {negotiation.autonomous_mode && (
+                    <p className="text-xs text-violet-700 mt-1.5 bg-violet-50 rounded px-2 py-1">
+                      AI is managing this negotiation autonomously.
+                    </p>
                   )}
                 </div>
               </CardContent>

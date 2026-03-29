@@ -11,10 +11,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
   }
 
-  // Decode clerk_user_id from state
+  // Decode clerk_user_id and returnTo from state
   let clerkUserId: string;
+  let returnTo = "/negotiate";
   try {
-    clerkUserId = Buffer.from(state, "base64").toString("utf-8");
+    const decoded = Buffer.from(state, "base64").toString("utf-8");
+    // Support both old format (plain user ID) and new format (JSON)
+    if (decoded.startsWith("{")) {
+      const parsed = JSON.parse(decoded);
+      clerkUserId = parsed.userId;
+      returnTo = parsed.returnTo ?? returnTo;
+    } else {
+      clerkUserId = decoded;
+    }
   } catch {
     return NextResponse.json({ error: "Invalid state" }, { status: 400 });
   }
@@ -56,5 +65,5 @@ export async function GET(req: NextRequest) {
           updated_at = NOW()
   `;
 
-  return NextResponse.redirect(new URL("/negotiate", process.env.GOOGLE_REDIRECT_URI!));
+  return NextResponse.redirect(new URL(returnTo, process.env.GOOGLE_REDIRECT_URI!));
 }

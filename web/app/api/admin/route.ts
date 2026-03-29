@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { getClerkUserEmail } from "@/lib/notify";
 
 async function isAdmin() {
   const user = await currentUser();
@@ -45,19 +46,29 @@ export async function GET() {
 
   await ensureTables();
 
-  const [promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailStateRows, gmailTokenRows] = await Promise.all([
+  const [promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailStateRows, gmailTokenRows, webhookLogs] = await Promise.all([
     sql`SELECT * FROM promo_codes ORDER BY created_at DESC`,
     sql`SELECT r.*, p.code as promo_code FROM promo_redemptions r JOIN promo_codes p ON r.code = p.code ORDER BY r.redeemed_at DESC LIMIT 50`,
     sql`SELECT * FROM enterprise_inquiries ORDER BY created_at DESC`,
     sql`SELECT * FROM waitlist ORDER BY created_at DESC`,
-    sql`SELECT * FROM user_plans ORDER BY updated_at DESC LIMIT 50`,
+    sql`SELECT * FROM user_plans ORDER BY updated_at DESC LIMIT 500`,
     sql`SELECT * FROM gmail_state WHERE id = 1`,
     sql`SELECT clerk_user_id, expires_at, updated_at FROM user_gmail_tokens LIMIT 10`,
+    sql`SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT 50`,
   ]);
 
   const gmailState = gmailStateRows[0] ?? null;
 
-  return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailState, gmailTokens: gmailTokenRows });
+  // Batch fetch emails from Clerk for all users
+  const userEmails: Record<string, string> = {};
+  await Promise.all(
+    (recentPlans as Array<{ clerk_user_id: string }>).map(async (p) => {
+      const email = await getClerkUserEmail(p.clerk_user_id);
+      if (email) userEmails[p.clerk_user_id] = email;
+    })
+  );
+
+  return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailState, gmailTokens: gmailTokenRows, webhookLogs, userEmails });
 }
 
 // POST — create promo code
@@ -115,6 +126,36 @@ export async function POST(req: Request) {
       SET plan = 'suite', updated_at = NOW()
     `;
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "simulate_inbound") {
+    // Directly insert a fake inbound message and generate an AI draft
+    const { negotiation_id, message_body } = data;
+    if (!negotiation_id || !message_body) return NextResponse.json({ error: "negotiation_id and message_body required" }, { status: 400 });
+
+    const [neg] = await sql`SELECT * FROM negotiations WHERE id = ${negotiation_id}`;
+    if (!neg) return NextResponse.json({ error: "Negotiation not found" }, { status: 404 });
+
+    const messages = await sql`SELECT direction, content FROM negotiation_messages WHERE negotiation_id = ${negotiation_id} ORDER BY created_at ASC`;
+    const history = (messages as Array<{ direction: string; content: string }>)
+      .map(m => `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`)
+      .join("\n\n");
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const aiMsg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 800,
+      system: `You are CounterPro, an expert real estate negotiation coach. Draft the ideal response for the user. Be strategic, professional, and concise. Use specific numbers. End with a clear next step. Do NOT include a subject line.`,
+      messages: [{ role: "user", content: `Property: ${neg.address}\n\nHistory:\n${history || "(none)"}\n\nNew message:\n${message_body}\n\nDraft my response:` }],
+    });
+    const draft = aiMsg.content[0].type === "text" ? aiMsg.content[0].text : "";
+
+    await sql`INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft) VALUES (${negotiation_id}, 'inbound', ${message_body}, ${draft})`;
+    await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiation_id}`;
+    await sql`INSERT INTO webhook_logs (event_type, detail, status) VALUES ('simulate', ${'neg=' + negotiation_id}, 'ok')`;
+
+    return NextResponse.json({ ok: true, draft });
   }
 
   if (action === "gmail_watch_stop") {

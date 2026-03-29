@@ -15,6 +15,7 @@ type WaitlistEntry = { id: number; email: string; created_at: string };
 type UserPlan = { clerk_user_id: string; plan: string; deals_remaining: number; subscription_end: string | null; updated_at: string };
 type GmailState = { history_id: string | null; watch_expiration: string | null; watch_email: string | null; updated_at: string };
 type GmailToken = { clerk_user_id: string; expires_at: string | null; updated_at: string };
+type WebhookLog = { id: number; event_type: string; detail: string | null; status: string; error: string | null; created_at: string };
 
 export default function AdminPage() {
   const [data, setData] = useState<{
@@ -24,6 +25,8 @@ export default function AdminPage() {
     recentPlans: UserPlan[];
     gmailState: GmailState | null;
     gmailTokens: GmailToken[];
+    webhookLogs: WebhookLog[];
+    userEmails: Record<string, string>;
   } | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,11 +46,21 @@ export default function AdminPage() {
   const [suiteUserId, setSuiteUserId] = useState("");
   const [suiteMsg, setSuiteMsg] = useState("");
 
+  // Users tab state
+  const [userSearch, setUserSearch] = useState("");
+  const [userPlanFilter, setUserPlanFilter] = useState("all");
+
   // Gmail watch state
   const [watchLoading, setWatchLoading] = useState(false);
   const [watchMsg, setWatchMsg] = useState("");
 
-  const [activeTab, setActiveTab] = useState<"promos" | "inquiries" | "waitlist" | "users" | "email">("promos");
+  // Simulate inbound email state
+  const [simNegId, setSimNegId] = useState("");
+  const [simBody, setSimBody] = useState("");
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResult, setSimResult] = useState<{ draft?: string; error?: string } | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"promos" | "inquiries" | "waitlist" | "users" | "email" | "allUsers">("promos");
 
   const load = async () => {
     const res = await fetch("/api/admin");
@@ -108,6 +121,14 @@ export default function AdminPage() {
     setWatchLoading(false); load();
   };
 
+  const simulateInbound = async () => {
+    if (!simNegId || !simBody) return;
+    setSimLoading(true); setSimResult(null);
+    const r = await api({ action: "simulate_inbound", negotiation_id: Number(simNegId), message_body: simBody });
+    setSimResult(r);
+    setSimLoading(false); load();
+  };
+
   const stopWatch = async () => {
     setWatchLoading(true); setWatchMsg("");
     const r = await api({ action: "gmail_watch_stop" });
@@ -128,6 +149,7 @@ export default function AdminPage() {
     { id: "promos", label: "Promo Codes", count: data?.promoCodes.length },
     { id: "inquiries", label: "Enterprise Inquiries", count: data?.inquiries.length },
     { id: "waitlist", label: "Waitlist", count: data?.waitlist.length },
+    { id: "allUsers", label: "Users", count: data?.recentPlans.length },
     { id: "users", label: "Grant Credits", count: null },
     { id: "email", label: "Email Bot", count: null },
   ] as const;
@@ -154,12 +176,12 @@ export default function AdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Active promo codes", value: data?.promoCodes.filter(p => p.uses_remaining > 0).length ?? 0 },
-            { label: "Enterprise inquiries", value: data?.inquiries.length ?? 0 },
-            { label: "Waitlist signups", value: data?.waitlist.length ?? 0 },
-            { label: "Paid users", value: data?.recentPlans.filter(p => p.plan !== "free").length ?? 0 },
+            { label: "Active promo codes", value: data?.promoCodes.filter(p => p.uses_remaining > 0).length ?? 0, tab: "promos" as const },
+            { label: "Enterprise inquiries", value: data?.inquiries.length ?? 0, tab: "inquiries" as const },
+            { label: "Waitlist signups", value: data?.waitlist.length ?? 0, tab: "waitlist" as const },
+            { label: "Paid users", value: data?.recentPlans.filter(p => p.plan !== "free").length ?? 0, tab: "allUsers" as const },
           ].map(s => (
-            <Card key={s.label}>
+            <Card key={s.label} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setActiveTab(s.tab)}>
               <CardContent className="pt-4 pb-4">
                 <p className="text-2xl font-bold">{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
@@ -339,7 +361,7 @@ export default function AdminPage() {
                       ) : isActive ? "Renew watch" : "Activate watch"}
                     </Button>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" onClick={() => { window.location.href = "/api/auth/gmail"; }}>
+                      <Button variant="outline" onClick={() => { window.location.href = "/api/auth/gmail?returnTo=/admin"; }}>
                         {data?.gmailTokens.length ? "Reconnect Gmail" : "Connect Gmail →"}
                       </Button>
                       <div className="flex items-center gap-1.5 text-sm">
@@ -385,6 +407,60 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
+              {/* Simulate inbound email */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Simulate inbound email</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Inject a fake inbound message directly — bypasses Gmail/Pub/Sub. Use to test AI drafts end-to-end.</p>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label>Negotiation ID</Label>
+                      <Input placeholder="1" value={simNegId} onChange={e => setSimNegId(e.target.value)} />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Message body</Label>
+                      <Input placeholder="Hi, we'd like to offer $280,000..." value={simBody} onChange={e => setSimBody(e.target.value)} />
+                    </div>
+                  </div>
+                  <Button onClick={simulateInbound} disabled={simLoading || !simNegId || !simBody}>
+                    {simLoading ? "Simulating..." : "Send test message →"}
+                  </Button>
+                  {simResult?.error && <p className="text-sm text-destructive">{simResult.error}</p>}
+                  {simResult?.draft && (
+                    <div className="bg-muted rounded-md p-3 text-sm space-y-1">
+                      <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">AI Draft</p>
+                      <p className="whitespace-pre-wrap">{simResult.draft}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Webhook logs */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Webhook logs</CardTitle>
+                    <Button size="sm" variant="outline" onClick={load}>Refresh</Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!data?.webhookLogs.length ? (
+                    <p className="text-sm text-muted-foreground">No logs yet. Send a test email or use Simulate above.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-96 overflow-y-auto font-mono text-xs">
+                      {data.webhookLogs.map(l => (
+                        <div key={l.id} className={`flex gap-3 py-1.5 border-b last:border-0 ${l.status === "error" ? "text-destructive" : l.status === "skip" ? "text-muted-foreground" : ""}`}>
+                          <span className="shrink-0 text-muted-foreground">{new Date(l.created_at).toLocaleTimeString()}</span>
+                          <span className={`shrink-0 w-20 font-medium ${l.status === "error" ? "text-red-600" : l.status === "skip" ? "text-yellow-600" : "text-green-600"}`}>{l.event_type}</span>
+                          <span className="truncate">{l.detail}</span>
+                          {l.error && <span className="shrink-0 text-destructive truncate max-w-xs">{l.error}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Grant suite */}
               <Card>
                 <CardHeader><CardTitle className="text-base">Grant Suite plan</CardTitle></CardHeader>
@@ -397,6 +473,74 @@ export default function AdminPage() {
                   {suiteMsg && <p className="text-sm text-green-600">{suiteMsg}</p>}
                 </CardContent>
               </Card>
+            </div>
+          );
+        })()}
+
+        {/* All Users */}
+        {activeTab === "allUsers" && (() => {
+          const planColors: Record<string, string> = {
+            suite: "bg-purple-100 text-purple-800 border-purple-200",
+            subscription: "bg-blue-100 text-blue-800 border-blue-200",
+            single: "bg-green-100 text-green-800 border-green-200",
+            free: "bg-gray-100 text-gray-600 border-gray-200",
+          };
+          const filtered = (data?.recentPlans ?? []).filter(p => {
+            const matchesPlan = userPlanFilter === "all" || p.plan === userPlanFilter;
+            const matchesSearch = !userSearch || p.clerk_user_id.toLowerCase().includes(userSearch.toLowerCase());
+            return matchesPlan && matchesSearch;
+          });
+          return (
+            <div className="space-y-4">
+              <div className="flex gap-3 flex-wrap">
+                <Input
+                  placeholder="Search by user ID..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  className="max-w-xs"
+                />
+                <div className="flex gap-1">
+                  {["all", "suite", "subscription", "single", "free"].map(p => (
+                    <Button
+                      key={p}
+                      size="sm"
+                      variant={userPlanFilter === p ? "default" : "outline"}
+                      onClick={() => setUserPlanFilter(p)}
+                      className="capitalize"
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{filtered.length} user{filtered.length !== 1 ? "s" : ""}</p>
+              <div className="space-y-2">
+                {filtered.map(p => (
+                  <div key={p.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm bg-background">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{data?.userEmails[p.clerk_user_id] ?? "—"}</p>
+                      <p className="font-mono text-xs text-muted-foreground truncate">{p.clerk_user_id}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {p.subscription_end && (
+                        <span className="text-xs text-muted-foreground hidden sm:block">
+                          {new Date(p.subscription_end) > new Date() ? "Renews" : "Expired"} {new Date(p.subscription_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      )}
+                      {p.plan === "single" && (
+                        <span className="text-xs text-muted-foreground">{p.deals_remaining} credit{p.deals_remaining !== 1 ? "s" : ""}</span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded border font-medium capitalize ${planColors[p.plan] ?? planColors.free}`}>
+                        {p.plan}
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setGrantUserId(p.clerk_user_id); setActiveTab("users"); }}>
+                        Edit →
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {filtered.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No users match your filter.</p>}
+              </div>
             </div>
           );
         })()}

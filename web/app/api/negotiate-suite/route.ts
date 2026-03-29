@@ -2,22 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
-import { getGmailToken, sendGmail as sendGmailLib } from "@/lib/gmail";
+import { getAccessToken, sendGmail as sendGmailLib } from "@/lib/gmail";
+import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown } from "@/lib/email-pipeline";
+import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const SUITE_SYSTEM = `You are CounterPro, an expert real estate negotiation coach.
-You are helping a user manage an ongoing negotiation thread.
-Given the full conversation history and the latest message from the counterparty,
-draft the ideal response for the user to send.
-
-Rules:
-- Be strategic, professional, and firm but not aggressive
-- Reference prior messages and any concessions already made
-- Keep responses concise — real estate emails are short
-- Use specific numbers, not ranges
-- End with a clear next step or deadline
-- Do NOT include a subject line — just the email body`;
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -40,25 +29,16 @@ export async function POST(req: NextRequest) {
     ORDER BY created_at ASC
   `;
 
-  // Build conversation history for Claude
-  const history = messages.map((m: any) =>
-    `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`
-  ).join("\n\n");
-
-  const prompt = `Property: ${neg.address}
-
-Negotiation history so far:
-${history || "(No prior messages)"}
-
-New message from counterparty:
-${newMessage}
-
-Draft my response:`;
+  const prompt = buildNegotiationPrompt(
+    neg.address,
+    messages as Array<{ direction: string; content: string }>,
+    newMessage
+  );
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 800,
-    system: SUITE_SYSTEM,
+    model: CLAUDE_MODEL,
+    max_tokens: SUITE_MAX_TOKENS,
+    system: SUITE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -97,15 +77,17 @@ export async function PUT(req: NextRequest) {
   if (!msg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const finalText = editedDraft || msg.ai_draft;
+  const plainText = stripMarkdown(finalText);
 
   let sent = false;
   if (approved && msg.counterparty_email) {
-    const gmailToken = await getGmailToken(userId);
-    if (gmailToken) {
+    const accessToken = await getAccessToken(userId);
+    if (accessToken) {
       try {
         const subject = `Re: Negotiation - ${msg.address}`;
         const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
-        sent = await sendGmailLib(userId, msg.counterparty_email, subject, finalText, fromAddress ?? undefined);
+        const replyTo = msg.alias_email ?? undefined;
+        sent = await sendGmailLib(userId, msg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
       } catch {
         // Gmail failure must not block approval
         sent = false;
