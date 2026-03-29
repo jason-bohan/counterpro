@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
@@ -34,6 +33,7 @@ const MARKET_OPTIONS = [
 ];
 
 export default function DealPage() {
+  const { user } = useUser();
   const [form, setForm] = useState({
     role: "buyer",
     address: "",
@@ -142,7 +142,11 @@ export default function DealPage() {
     const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").replace(/^---\s*\n/m, "").trim().slice(0, 1800);
     const subject = encodeURIComponent(subjectLine);
     const body = encodeURIComponent(bodyText);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    const a = document.createElement("a");
+    a.href = `mailto:?subject=${subject}&body=${body}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -185,7 +189,7 @@ export default function DealPage() {
             <span className="font-medium text-sm">New deal</span>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="text-xs">AI</Badge>
+            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
             <UserButton />
           </div>
         </div>

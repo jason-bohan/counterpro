@@ -99,6 +99,8 @@ export async function setupDatabase() {
     )
   `;
 
+  await sql`ALTER TABLE user_plans ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`;
 

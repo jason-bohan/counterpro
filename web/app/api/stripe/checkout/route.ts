@@ -1,15 +1,13 @@
 import Stripe from "stripe";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { getUserPlan } from "@/lib/db";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? undefined;
 
   const { plan } = await req.json();
   const validPlans = ["subscription", "single", "suite"];
@@ -23,15 +21,36 @@ export async function POST(req: NextRequest) {
     ? process.env.STRIPE_SUITE_PRICE_ID!
     : process.env.STRIPE_SINGLE_PRICE_ID!;
 
-  const session = await stripe.checkout.sessions.create({
-    mode: plan === "subscription" || plan === "suite" ? "subscription" : "payment",
-    payment_method_types: ["card"],
-    customer_email: email,
-    line_items: [{ price: priceId, quantity: 1 }],
-    metadata: { clerk_user_id: userId, plan },
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
-  });
+  try {
+    // Reuse existing live Stripe customer if available, otherwise fall back to email
+    const existingPlan = await getUserPlan(userId);
+    const existingCustomerId = existingPlan?.stripe_customer_id;
+    // Only reuse customer IDs that match the current mode (live vs test)
+    const isLive = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live");
+    const customerIdValid = existingCustomerId &&
+      (isLive ? existingCustomerId.startsWith("cus_") : true);
 
-  return NextResponse.json({ url: session.url });
+    const customerParam = customerIdValid
+      ? { customer: existingCustomerId }
+      : await (async () => {
+          const user = await currentUser();
+          const email = user?.emailAddresses?.[0]?.emailAddress;
+          return email ? { customer_email: email } : {};
+        })();
+
+    const session = await stripe.checkout.sessions.create({
+      mode: plan === "subscription" || plan === "suite" ? "subscription" : "payment",
+      payment_method_types: ["card"],
+      ...customerParam,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { clerk_user_id: userId, plan },
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    console.error("Stripe checkout error:", err);
+    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
+  }
 }

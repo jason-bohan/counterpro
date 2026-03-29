@@ -45,10 +45,22 @@ export default function DealViewPage() {
     const subject = encodeURIComponent(subjectLine);
     const body = encodeURIComponent(bodyText);
     const mailto = `mailto:?subject=${subject}&body=${body}`;
-    window.location.href = mailto;
+    const a = document.createElement("a");
+    a.href = mailto;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     await navigator.clipboard.writeText(bodyText).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
+  };
+
+  const savePdf = () => {
+    const slug = deal.address.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    const original = document.title;
+    document.title = `CounterPro Deal Assessment - ${slug}`;
+    window.print();
+    setTimeout(() => { document.title = original; }, 1000);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
@@ -93,7 +105,7 @@ export default function DealViewPage() {
         </Card>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
-          <Button variant="outline" onClick={() => window.print()}>Save as PDF</Button>
+          <Button variant="outline" onClick={savePdf}>Save as PDF</Button>
           <Button onClick={copyEmailScript}>
             {copied ? "✓ Opening email..." : "Send email script →"}
           </Button>

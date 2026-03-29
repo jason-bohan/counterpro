@@ -44,9 +44,23 @@ function DashboardInner() {
       .catch(() => {});
   }, []);
 
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const openPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const { url } = await res.json();
+      if (url) window.location.href = url;
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   const planLabel = () => {
     if (!plan || plan.plan === "free") return null;
     if (plan.plan === "subscription") return <Badge className="bg-green-600 text-white">Unlimited subscription</Badge>;
+    if (plan.plan === "suite") return <Badge className="bg-purple-600 text-white">Suite</Badge>;
     if (plan.plan === "single") return <Badge variant="outline">{plan.deals_remaining} deal credit{plan.deals_remaining !== 1 ? "s" : ""} remaining</Badge>;
     return null;
   };
@@ -59,6 +73,11 @@ function DashboardInner() {
           <Logo size={44} href="/" />
           <div className="flex items-center gap-3">
             {planLabel()}
+            {(plan?.plan === "subscription" || plan?.plan === "suite") && (
+              <Button variant="ghost" size="sm" onClick={openPortal} disabled={portalLoading}>
+                {portalLoading ? "Loading..." : "Manage subscription"}
+              </Button>
+            )}
             <UserButton />
           </div>
         </div>
