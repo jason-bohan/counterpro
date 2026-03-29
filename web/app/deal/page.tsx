@@ -142,11 +142,7 @@ export default function DealPage() {
     const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").replace(/^---\s*\n/m, "").trim().slice(0, 1800);
     const subject = encodeURIComponent(subjectLine);
     const body = encodeURIComponent(bodyText);
-    const a = document.createElement("a");
-    a.href = `mailto:?subject=${subject}&body=${body}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
