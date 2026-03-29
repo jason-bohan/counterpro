@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase } from "@/lib/db";
 import { getAccessToken, sendGmail } from "@/lib/gmail";
-import { sendDraftReadyEmail, sendAutonomousUpdateEmail, getClerkUserEmail } from "@/lib/notify";
+import { sendDraftReadyEmail, sendAutonomousUpdateEmail, getClerkUser } from "@/lib/notify";
 import { stripMarkdown } from "@/lib/email-pipeline";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseEmail, routeInboundEmail, buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
@@ -176,10 +176,9 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
           VALUES (${negotiationId}, 'outbound', ${plainText}, true, NOW())
         `;
         await wlog("autonomous_sent", `neg=${negotiationId} to=${neg.counterparty_email}`);
-        // Notify user that AI sent on their behalf
-        const userEmail = await getClerkUserEmail(neg.clerk_user_id);
-        if (userEmail) {
-          await sendAutonomousUpdateEmail(userEmail, neg.address, negotiationId, plainText);
+        const user = await getClerkUser(neg.clerk_user_id);
+        if (user) {
+          await sendAutonomousUpdateEmail(user.email, neg.address, negotiationId, plainText, user.firstName, neg.counterparty_email);
         }
         return;
       } else {
@@ -191,10 +190,10 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   }
 
   // Notify user to review draft
-  const userEmail = await getClerkUserEmail(neg.clerk_user_id);
-  if (userEmail) {
-    await sendDraftReadyEmail(userEmail, neg.address, negotiationId, draft);
-    await wlog("draft_ready", `neg=${negotiationId} notified=${userEmail}`);
+  const user = await getClerkUser(neg.clerk_user_id);
+  if (user) {
+    await sendDraftReadyEmail(user.email, neg.address, negotiationId, draft, user.firstName, fromHeader);
+    await wlog("draft_ready", `neg=${negotiationId} notified=${user.email}`);
   } else {
     await wlog("notify", `neg=${negotiationId} user=${neg.clerk_user_id} — could not find email`, "error");
     console.error(`[gmail-webhook] Could not find email for user ${neg.clerk_user_id}`);

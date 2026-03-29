@@ -77,7 +77,8 @@ export async function sendGmail(
   subject: string,
   body: string,
   from?: string,
-  replyTo?: string
+  replyTo?: string,
+  html?: string
 ): Promise<boolean> {
   let token = await getGmailToken(userId);
   if (!token) {
@@ -107,13 +108,30 @@ export async function sendGmail(
   if (replyTo) {
     emailLines.push(`Reply-To: ${replyTo}`);
   }
-  emailLines.push(
-    `Subject: ${encodedSubject}`,
-    `Content-Type: text/plain; charset=utf-8`,
-    `Content-Transfer-Encoding: quoted-printable`,
-    ``,
-    body,
-  );
+  if (html) {
+    emailLines.push(
+      `Subject: ${encodedSubject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/alternative; boundary="boundary_cp"`,
+      ``,
+      `--boundary_cp`,
+      `Content-Type: text/plain; charset=utf-8`,
+      ``,
+      body,
+      `--boundary_cp`,
+      `Content-Type: text/html; charset=utf-8`,
+      ``,
+      html,
+      `--boundary_cp--`,
+    );
+  } else {
+    emailLines.push(
+      `Subject: ${encodedSubject}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      ``,
+      body,
+    );
+  }
   const raw = Buffer.from(emailLines.join("\r\n"), "utf8").toString("base64url");
 
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
