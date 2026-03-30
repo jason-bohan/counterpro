@@ -18,6 +18,7 @@ export async function GET() {
       (SELECT COUNT(*) FROM negotiation_messages WHERE negotiation_id = n.id AND approved = false AND direction = 'inbound') as pending_count
     FROM negotiations n
     WHERE n.clerk_user_id = ${userId}
+    AND n.archived_at IS NULL
     ORDER BY n.updated_at DESC
   `;
 

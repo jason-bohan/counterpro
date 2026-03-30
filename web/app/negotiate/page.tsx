@@ -157,6 +157,9 @@ export default function NegotiateSuitePage() {
             <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Dashboard
             </Link>
+            <Link href="/archive" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Archive
+            </Link>
             {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
             <UserButton />
           </div>
@@ -318,10 +321,9 @@ export default function NegotiateSuitePage() {
                             {t.status === "active" ? "Active" : "Closed"}
                           </Badge>
                           {Number(t.pending_count) > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-orange-600 shrink-0">
-                              <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
-                              1 draft pending
-                            </span>
+                            <Badge className="text-xs shrink-0 bg-orange-500 text-white border-0">
+                              {Number(t.pending_count)} new
+                            </Badge>
                           )}
                         </div>
                         {/* Last message preview */}

@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { status, counterparty_email, deadline_date, autonomous_mode } = body;
+  const { status, counterparty_email, deadline_date, autonomous_mode, archived } = body;
 
   const validStatuses = ["active", "pending", "closed", "won", "lost"];
   if (status !== undefined && !validStatuses.includes(status)) {
@@ -76,10 +76,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
+      archived_at = ${archived === true ? sql`NOW()` : archived === false ? null : sql`archived_at`},
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
     RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, updated_at
   `;
 
   return NextResponse.json({ ok: true, negotiation: updated });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const { id } = await params;
+  const negotiationId = parseInt(id, 10);
+  if (isNaN(negotiationId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  // Only allow deleting archived negotiations
+  const [row] = await sql`
+    DELETE FROM negotiations
+    WHERE id = ${negotiationId} AND clerk_user_id = ${userId} AND archived_at IS NOT NULL
+    RETURNING id
+  `;
+  if (!row) return NextResponse.json({ error: "Not found or not archived" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }

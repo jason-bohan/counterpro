@@ -149,29 +149,48 @@ function DashboardInner() {
 
         {/* Pricing */}
         <div data-section="pricing-cards" className="grid sm:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <Badge variant="outline" className="w-fit">Single deal</Badge>
-              <CardTitle className="text-2xl mt-2">$50</CardTitle>
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
+              <Badge variant="outline" className="w-fit text-xs">Single deal</Badge>
+              <div className="mt-3">
+                <span className="text-4xl font-bold">$50</span>
+              </div>
+              <p className="text-sm text-muted-foreground">One-time, no subscription required.</p>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">One negotiation package. Full strategy, scripts, and analysis.</p>
-              <Link href="/pricing">
-                <Button className="w-full" variant="outline">Get package</Button>
-              </Link>
-              <PromoCode onRedeemed={() => window.location.reload()} />
+            <CardContent className="flex flex-col flex-1 gap-4">
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Full negotiation strategy</li>
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Email & verbal scripts</li>
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Walk-away point analysis</li>
+              </ul>
+              <div className="mt-auto space-y-2">
+                <Link href="/pricing">
+                  <Button className="w-full" variant="outline">Get package</Button>
+                </Link>
+                <PromoCode onRedeemed={() => window.location.reload()} />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-primary border-2">
-            <CardHeader className="pb-2">
-              <Badge className="w-fit">Best value</Badge>
-              <CardTitle className="text-2xl mt-2">$100<span className="text-base font-normal text-muted-foreground">/mo</span></CardTitle>
+          <Card className="border-primary border-2 flex flex-col">
+            <CardHeader className="pb-3">
+              <Badge className="w-fit text-xs">Best value</Badge>
+              <div className="mt-3">
+                <span className="text-4xl font-bold">$100</span>
+                <span className="text-base font-normal text-muted-foreground">/mo</span>
+              </div>
+              <p className="text-sm text-muted-foreground">Unlimited deals, cancel anytime.</p>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Unlimited deals per month. Ideal for investors and frequent buyers/sellers.</p>
-              <Link href="/pricing">
-                <Button className="w-full">Subscribe</Button>
-              </Link>
+            <CardContent className="flex flex-col flex-1 gap-4">
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Everything in Single deal</li>
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Unlimited deals per month</li>
+                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Ideal for investors & agents</li>
+              </ul>
+              <div className="mt-auto">
+                <Link href="/pricing">
+                  <Button className="w-full">Subscribe →</Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>

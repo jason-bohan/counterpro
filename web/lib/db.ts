@@ -99,6 +99,9 @@ export async function setupDatabase() {
     )
   `;
 
+  await sql`ALTER TABLE deals ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+
   await sql`ALTER TABLE user_plans ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
 
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
@@ -128,6 +131,7 @@ export async function getUserDeals(clerkUserId: string) {
     SELECT id, address, role, asking_price, offer_amount, created_at
     FROM deals
     WHERE clerk_user_id = ${clerkUserId}
+    AND archived_at IS NULL
     ORDER BY created_at DESC
     LIMIT 50
   `;

@@ -59,12 +59,16 @@ export async function GET() {
 
   const gmailState = gmailStateRows[0] ?? null;
 
-  // Batch fetch emails from Clerk for all users
+  // Batch fetch emails from Clerk for all unique users across all sections
+  const allUserIds = new Set([
+    ...(recentPlans as Array<{ clerk_user_id: string }>).map(p => p.clerk_user_id),
+    ...(gmailTokenRows as Array<{ clerk_user_id: string }>).map(t => t.clerk_user_id),
+  ]);
   const userEmails: Record<string, string> = {};
   await Promise.all(
-    (recentPlans as Array<{ clerk_user_id: string }>).map(async (p) => {
-      const email = await getClerkUserEmail(p.clerk_user_id);
-      if (email) userEmails[p.clerk_user_id] = email;
+    [...allUserIds].map(async (id) => {
+      const email = await getClerkUserEmail(id);
+      if (email) userEmails[id] = email;
     })
   );
 

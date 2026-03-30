@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
 import { getAccessToken, sendGmail as sendGmailLib } from "@/lib/gmail";
-import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown } from "@/lib/email-pipeline";
+import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -77,17 +77,21 @@ export async function PUT(req: NextRequest) {
   if (!msg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const finalText = editedDraft || msg.ai_draft;
-  const plainText = stripMarkdown(finalText);
+  const plainText = stripAiPreamble(stripMarkdown(finalText));
 
   let sent = false;
   if (approved && msg.counterparty_email) {
-    const accessToken = await getAccessToken(userId);
+    // Fall back to system account if the user hasn't connected their own Gmail
+    const sendAsUserId = (await getAccessToken(userId))
+      ? userId
+      : (process.env.GMAIL_SYSTEM_USER_ID ?? userId);
+    const accessToken = await getAccessToken(sendAsUserId);
     if (accessToken) {
       try {
         const subject = `Re: Negotiation - ${msg.address}`;
         const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
         const replyTo = msg.alias_email ?? undefined;
-        sent = await sendGmailLib(userId, msg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
+        sent = await sendGmailLib(sendAsUserId, msg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
       } catch {
         // Gmail failure must not block approval
         sent = false;
@@ -138,7 +142,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No counterparty email set" }, { status: 400 });
   }
 
-  const accessToken = await getAccessToken(userId);
+  const sendAsUserId = (await getAccessToken(userId))
+    ? userId
+    : (process.env.GMAIL_SYSTEM_USER_ID ?? userId);
+  const accessToken = await getAccessToken(sendAsUserId);
   if (!accessToken) return NextResponse.json({ error: "Gmail not connected" }, { status: 400 });
 
   let sent = false;
@@ -146,7 +153,7 @@ export async function PATCH(req: NextRequest) {
     const subject = `Re: Negotiation - ${msg.address}`;
     const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
     const replyTo = msg.alias_email ?? undefined;
-    sent = await sendGmailLib(userId, msg.counterparty_email, subject, msg.content, fromAddress ?? undefined, replyTo);
+    sent = await sendGmailLib(sendAsUserId, msg.counterparty_email, subject, msg.content, fromAddress ?? undefined, replyTo);
   } catch {
     sent = false;
   }

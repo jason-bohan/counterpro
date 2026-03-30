@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase } from "@/lib/db";
 import { getAccessToken, sendGmail } from "@/lib/gmail";
 import { sendDraftReadyEmail, sendAutonomousUpdateEmail, getClerkUser } from "@/lib/notify";
-import { stripMarkdown } from "@/lib/email-pipeline";
+import { stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseEmail, routeInboundEmail, buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
@@ -24,9 +24,25 @@ async function getSystemAccessToken(): Promise<string | null> {
 async function processNewMessages(historyId: string): Promise<void> {
   await setupDatabase();
 
-  // Load last known historyId
+  // Atomically advance the stored historyId only if the incoming one is newer.
+  // If another concurrent request already processed this historyId, the UPDATE
+  // matches no rows and we skip — preventing duplicate message processing.
   const [stateRow] = await sql`SELECT history_id FROM gmail_state WHERE id = 1`;
   const startHistoryId = stateRow?.history_id ?? historyId;
+
+  const [advanced] = await sql`
+    INSERT INTO gmail_state (id, history_id, updated_at)
+    VALUES (1, ${historyId}, NOW())
+    ON CONFLICT (id) DO UPDATE
+      SET history_id = ${historyId}, updated_at = NOW()
+      WHERE gmail_state.history_id < ${historyId}
+    RETURNING history_id
+  `;
+
+  if (!advanced) {
+    await wlog("history", `historyId=${historyId} already processed — skip`);
+    return;
+  }
 
   const accessToken = await getSystemAccessToken();
   if (!accessToken) {
@@ -61,13 +77,6 @@ async function processNewMessages(historyId: string): Promise<void> {
   }
 
   await wlog("history", `historyId=${historyId} found ${messageIds.size} new message(s)`);
-
-  // Update stored historyId to the latest one we received
-  await sql`
-    INSERT INTO gmail_state (id, history_id, updated_at)
-    VALUES (1, ${historyId}, NOW())
-    ON CONFLICT (id) DO UPDATE SET history_id = ${historyId}, updated_at = NOW()
-  `;
 
   for (const msgId of messageIds) {
     try {
@@ -150,13 +159,17 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   // Autonomous mode: send immediately without user approval
   if (neg.autonomous_mode) {
     await wlog("autonomous", `neg=${negotiationId} — auto-sending draft`);
-    const plainText = stripMarkdown(draft);
-    const userToken = await getAccessToken(neg.clerk_user_id);
-    if (userToken && neg.counterparty_email) {
+    const plainText = stripAiPreamble(stripMarkdown(draft));
+    // Fall back to system account if the user hasn't connected their own Gmail
+    const sendAsUserId = (await getAccessToken(neg.clerk_user_id))
+      ? neg.clerk_user_id
+      : (process.env.GMAIL_SYSTEM_USER_ID ?? neg.clerk_user_id);
+    const sendToken = await getAccessToken(sendAsUserId);
+    if (sendToken && neg.counterparty_email) {
       const subject = `Re: Negotiation - ${neg.address}`;
       const fromAddress = neg.alias_email || process.env.GMAIL_SALES_ADDRESS;
       const replyTo = neg.alias_email ?? undefined;
-      const sent = await sendGmail(neg.clerk_user_id, neg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
+      const sent = await sendGmail(sendAsUserId, neg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
 
       if (sent) {
         // Mark inbound as approved, save outbound

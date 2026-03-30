@@ -193,6 +193,15 @@ export function stripMarkdown(text: string): string {
     .trim();
 }
 
+// Strips common AI preamble phrases that should never appear in a sent email.
+// Applied at send time only — draft review UI keeps the original text.
+export function stripAiPreamble(text: string): string {
+  return text
+    .replace(/^(here'?s? (is )?(a |my )?(draft|suggested|sample) (response|reply|email)[:\s]*\n*)/i, "")
+    .replace(/^(draft (response|reply|email)[:\s]*\n*)/i, "")
+    .trimStart();
+}
+
 export const SUITE_SYSTEM_PROMPT = `You are CounterPro, an expert real estate negotiation coach.
 You are helping a user manage an ongoing negotiation thread.
 Given the full conversation history and the latest message from the counterparty,
@@ -204,4 +213,5 @@ Rules:
 - Keep responses concise — real estate emails are short
 - Use specific numbers, not ranges
 - End with a clear next step or deadline
-- Do NOT include a subject line — just the email body`;
+- Do NOT include a subject line — just the email body
+- Do NOT include any preamble like "Here's a draft response:" or "Here is my suggested reply:" — start directly with the email content`;

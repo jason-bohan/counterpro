@@ -394,7 +394,10 @@ export default function AdminPage() {
                         const tokenOk = tokenExpiry ? tokenExpiry > new Date() : true;
                         return (
                           <div key={t.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
-                            <span className="font-mono text-xs text-muted-foreground truncate max-w-xs">{t.clerk_user_id}</span>
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{data?.userEmails[t.clerk_user_id] ?? "—"}</p>
+                              <p className="font-mono text-xs text-muted-foreground truncate">{t.clerk_user_id}</p>
+                            </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <span className={`w-2 h-2 rounded-full ${tokenOk ? "bg-green-500" : "bg-red-400"}`} />
                               <span className="text-xs text-muted-foreground">
@@ -586,7 +589,10 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   {data?.recentPlans.filter(p => p.plan !== "free").map(p => (
                     <div key={p.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
-                      <span className="font-mono text-xs text-muted-foreground truncate max-w-xs">{p.clerk_user_id}</span>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{data?.userEmails[p.clerk_user_id] ?? "—"}</p>
+                        <p className="font-mono text-xs text-muted-foreground truncate">{p.clerk_user_id}</p>
+                      </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge variant={p.plan === "subscription" ? "default" : "secondary"}>{p.plan}</Badge>
                         {p.plan === "single" && <span className="text-muted-foreground">{p.deals_remaining} left</span>}

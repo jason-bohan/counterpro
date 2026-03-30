@@ -22,17 +22,28 @@ export async function GET(
 
   const prompt = buildMarketResearchPrompt(neg.address);
 
-  const message = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 300,
-    messages: [{ role: "user", content: prompt }],
-  });
+  let message;
+  try {
+    message = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }],
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[research] Anthropic API error:", msg);
+    return NextResponse.json({ error: `AI error: ${msg}` }, { status: 500 });
+  }
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
 
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    console.error("[research] No JSON in AI response:", text.slice(0, 300));
+    return NextResponse.json({ error: "Could not estimate market value" }, { status: 500 });
+  }
+
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
     const data = JSON.parse(jsonMatch[0]);
     return NextResponse.json({
       market_value_low: data.market_value_low,

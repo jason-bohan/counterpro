@@ -273,6 +273,15 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const archiveNegotiation = async () => {
+    await fetch(`/api/negotiate-suite/threads/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: true }),
+    });
+    window.location.href = "/negotiate";
+  };
+
   const toggleDeadline = async (dlId: number, completed: boolean) => {
     await fetch(`/api/negotiate-suite/threads/${id}/deadlines`, {
       method: "PATCH",
@@ -358,6 +367,9 @@ export default function NegotiateThreadPage() {
             >
               {negotiation.status === "active" ? "Active" : "Closed"}
             </Badge>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={archiveNegotiation}>
+              Archive
+            </Button>
           </div>
         </div>
       </header>
@@ -411,7 +423,7 @@ export default function NegotiateThreadPage() {
                       <div className="rounded-lg bg-muted/60 px-4 py-3 space-y-1">
                         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">AI Market Estimate</p>
                         <p className="text-sm font-semibold">
-                          ${research.market_value_low.toLocaleString()} – ${research.market_value_high.toLocaleString()}
+                          ${research.market_value_low?.toLocaleString() ?? "—"} – ${research.market_value_high?.toLocaleString() ?? "—"}
                         </p>
                         <p className="text-xs text-muted-foreground">{research.reasoning}</p>
                       </div>
@@ -423,7 +435,7 @@ export default function NegotiateThreadPage() {
                         {negotiation.role === "seller" ? "Asking price" : "Your opening offer"}
                         {research && (
                           <span className="ml-2 text-xs text-muted-foreground font-normal">
-                            (AI suggests ${research.suggested_offer.toLocaleString()})
+                            (AI suggests ${research.suggested_offer?.toLocaleString() ?? "—"})
                           </span>
                         )}
                       </Label>
@@ -493,11 +505,11 @@ export default function NegotiateThreadPage() {
                       )}
                       {m.direction === "outbound" && !m.sent_at && m.approved && (
                         <>
-                          <Badge variant="outline" className="text-xs h-4 shrink-0">Send failed</Badge>
+                          <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
                           <button
                             onClick={() => resendMessage(m.id)}
                             disabled={resending === m.id}
-                            className="text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+                            className="text-xs text-primary-foreground/70 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 shrink-0"
                           >
                             {resending === m.id ? "Sending..." : "Retry"}
                           </button>
