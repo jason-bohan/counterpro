@@ -49,8 +49,22 @@ function DashboardInner() {
     setPortalLoading(true);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
-      const { url } = await res.json();
-      if (url) window.location.href = url;
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error("Portal API error:", data.error);
+        alert(data.error || "Unable to open subscription portal");
+        return;
+      }
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("No portal URL received");
+      }
+    } catch (error) {
+      console.error("Portal error:", error);
+      alert("Failed to open subscription portal");
     } finally {
       setPortalLoading(false);
     }
@@ -72,14 +86,18 @@ function DashboardInner() {
           <Logo size={44} href="/" />
           <div className="flex items-center gap-3">
             {planLabel()}
-            {(plan?.plan === "subscription" || plan?.plan === "suite") && (
+            {(plan?.plan === "subscription" || plan?.plan === "suite" || plan?.plan === "single") && (
               <Button variant="ghost" size="sm" onClick={openPortal} disabled={portalLoading}>
-                {portalLoading ? "Loading..." : "Manage subscription"}
+                {portalLoading ? "Loading..." : plan?.plan === "single" ? "Billing" : "Manage subscription"}
               </Button>
             )}
             {user?.firstName ? (
               <span className="text-sm text-muted-foreground">
                 {user.firstName}
+              </span>
+            ) : user?.username ? (
+              <span className="text-sm text-muted-foreground">
+                {user.username}
               </span>
             ) : user?.emailAddresses?.[0] ? (
               <span className="text-sm text-muted-foreground">
@@ -100,7 +118,7 @@ function DashboardInner() {
 
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : user?.emailAddresses?.[0] ? `, ${user.emailAddresses[0].emailAddress}` : ""}
+            Welcome back{user?.firstName ? `, ${user.firstName}` : user?.username ? `, ${user.username}` : user?.emailAddresses?.[0] ? `, ${user.emailAddresses[0].emailAddress}` : ""}
           </h1>
           <p className="text-muted-foreground mt-1">Ready to negotiate your next deal?</p>
         </div>
