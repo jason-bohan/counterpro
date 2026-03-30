@@ -81,10 +81,6 @@ function DashboardInner() {
               <span className="text-sm text-muted-foreground">
                 {user.firstName}
               </span>
-            ) : user?.username ? (
-              <span className="text-sm text-muted-foreground">
-                {user.username}
-              </span>
             ) : user?.emailAddresses?.[0] ? (
               <span className="text-sm text-muted-foreground">
                 {user.emailAddresses[0].emailAddress}
@@ -104,7 +100,7 @@ function DashboardInner() {
 
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : user?.username ? `, ${user.username}` : user?.emailAddresses?.[0] ? `, ${user.emailAddresses[0].emailAddress}` : ""}
+            Welcome back{user?.firstName ? `, ${user.firstName}` : user?.emailAddresses?.[0] ? `, ${user.emailAddresses[0].emailAddress}` : ""}
           </h1>
           <p className="text-muted-foreground mt-1">Ready to negotiate your next deal?</p>
         </div>
