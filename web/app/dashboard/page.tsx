@@ -86,9 +86,9 @@ function DashboardInner() {
           <Logo size={44} href="/" />
           <div className="flex items-center gap-3">
             {planLabel()}
-            {(plan?.plan === "subscription" || plan?.plan === "suite") && (
+            {(plan?.plan === "subscription" || plan?.plan === "suite" || plan?.plan === "single") && (
               <Button variant="ghost" size="sm" onClick={openPortal} disabled={portalLoading}>
-                {portalLoading ? "Loading..." : "Manage subscription"}
+                {portalLoading ? "Loading..." : plan?.plan === "single" ? "Billing" : "Manage subscription"}
               </Button>
             )}
             {user?.firstName ? (

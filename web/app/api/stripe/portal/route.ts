@@ -11,6 +11,9 @@ export async function POST() {
 
   const plan = await getUserPlan(userId);
   if (!plan?.stripe_customer_id) {
+    if (plan?.plan === "single") {
+      return NextResponse.json({ error: "One-time purchases don't have a subscription portal" }, { status: 400 });
+    }
     return NextResponse.json({ error: "No active subscription" }, { status: 400 });
   }
 
