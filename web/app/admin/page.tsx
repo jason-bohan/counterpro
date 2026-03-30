@@ -138,6 +138,13 @@ export default function AdminPage() {
     setWatchLoading(false); load();
   };
 
+  const deleteGmailToken = async (clerk_user_id: string) => {
+    if (!confirm("Delete this Gmail token?")) return;
+    const r = await api({ action: "delete_gmail_token", clerk_user_id });
+    if (r.ok) load();
+    else alert(r.error);
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (forbidden) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-6">
@@ -398,11 +405,14 @@ export default function AdminPage() {
                               <p className="font-medium truncate">{data?.userEmails[t.clerk_user_id] ?? "—"}</p>
                               <p className="font-mono text-xs text-muted-foreground truncate">{t.clerk_user_id}</p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`w-2 h-2 rounded-full ${tokenOk ? "bg-green-500" : "bg-red-400"}`} />
-                              <span className="text-xs text-muted-foreground">
-                                {tokenExpiry ? `Expires ${tokenExpiry.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No expiry"}
-                              </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${tokenOk ? "bg-green-500" : "bg-red-400"}`} />
+                                <span className="text-xs text-muted-foreground">
+                                  {tokenExpiry ? `Expires ${tokenExpiry.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No expiry"}
+                                </span>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => deleteGmailToken(t.clerk_user_id)} className="h-6 px-2 text-xs">Delete</Button>
                             </div>
                           </div>
                         );
