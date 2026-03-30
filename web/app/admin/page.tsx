@@ -171,6 +171,8 @@ export default function AdminPage() {
             <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Dashboard</Link>
             <span className="text-muted-foreground">/</span>
             <span className="font-semibold text-sm">Admin</span>
+            <span className="text-muted-foreground">/</span>
+            <Link href="/admin/api-status" className="text-sm text-muted-foreground hover:text-foreground transition-colors">API Status</Link>
           </div>
           <UserButton />
         </div>

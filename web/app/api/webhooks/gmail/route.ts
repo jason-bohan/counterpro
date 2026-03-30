@@ -21,7 +21,7 @@ async function getSystemAccessToken(): Promise<string | null> {
   return getAccessToken(systemUserId);
 }
 
-async function processNewMessages(historyId: string): Promise<void> {
+export async function processNewMessages(historyId: string): Promise<void> {
   await setupDatabase();
 
   // Atomically advance the stored historyId only if the incoming one is newer.

@@ -131,6 +131,39 @@ export default function NegotiateThreadPage() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  // Poll for new inbound messages every 20 seconds.
+  // Skips the poll while the user is actively editing a draft to avoid disrupting their work.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!pendingDraft || editedDraft === pendingDraft.draft) {
+        // Silent background refresh — don't touch loading state
+        fetch(`/api/negotiate-suite/threads/${id}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d) return;
+            setMessages(prev => {
+              // Only update if message count changed to avoid disrupting edits
+              if ((d.messages ?? []).length !== prev.length) {
+                // Re-evaluate pending draft from the latest data
+                const pending = (d.messages ?? []).find(
+                  (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
+                );
+                if (pending && !pendingDraft) {
+                  setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
+                  setEditedDraft(pending.ai_draft!);
+                }
+                return d.messages ?? [];
+              }
+              return prev;
+            });
+          })
+          .catch(() => {});
+      }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [id, pendingDraft, editedDraft]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingDraft]);

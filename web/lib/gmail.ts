@@ -55,7 +55,17 @@ export async function refreshGmailToken(userId: string): Promise<string | null> 
     }),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // invalid_grant means the refresh token was revoked or expired (e.g. app in Google "Testing" mode
+    // causes refresh tokens to expire after 7 days). Clear the stale token so the user is prompted
+    // to reconnect rather than silently failing on every send.
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error === "invalid_grant") {
+      console.warn(`[gmail] invalid_grant for user=${userId} — clearing stale token`);
+      await sql`DELETE FROM user_gmail_tokens WHERE clerk_user_id = ${userId}`;
+    }
+    return null;
+  }
 
   const data = await res.json();
   const newAccessToken: string = data.access_token;
