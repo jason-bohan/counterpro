@@ -33,14 +33,6 @@ function DashboardInner() {
   const searchParams = useSearchParams();
   const paymentSuccess = searchParams.get("payment") === "success";
 
-  // Debug: Log user object to see its structure
-  console.log("User object:", user);
-  console.log("User firstName:", user?.firstName);
-  console.log("User fullName:", user?.fullName);
-  console.log("User username:", user?.username);
-  console.log("User emailAddresses:", user?.emailAddresses);
-  console.log("User primary email:", user?.emailAddresses?.[0]?.emailAddress);
-
   useEffect(() => {
     fetch("/api/deals")
       .then((r) => r.json())
