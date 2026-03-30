@@ -78,6 +78,7 @@ function DashboardInner() {
                 {portalLoading ? "Loading..." : "Manage subscription"}
               </Button>
             )}
+            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
             <UserButton />
           </div>
         </div>

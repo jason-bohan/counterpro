@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ function relativeTime(dateStr: string): string {
 
 export default function NegotiateSuitePage() {
   const router = useRouter();
+  const { user } = useUser();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -156,6 +157,7 @@ export default function NegotiateSuitePage() {
             <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Dashboard
             </Link>
+            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
             <UserButton />
           </div>
         </div>
