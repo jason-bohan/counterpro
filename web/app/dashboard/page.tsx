@@ -49,8 +49,22 @@ function DashboardInner() {
     setPortalLoading(true);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
-      const { url } = await res.json();
-      if (url) window.location.href = url;
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error("Portal API error:", data.error);
+        alert(data.error || "Unable to open subscription portal");
+        return;
+      }
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("No portal URL received");
+      }
+    } catch (error) {
+      console.error("Portal error:", error);
+      alert("Failed to open subscription portal");
     } finally {
       setPortalLoading(false);
     }
