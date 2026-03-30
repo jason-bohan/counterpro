@@ -97,15 +97,63 @@ export async function PUT(req: NextRequest) {
 
   await sql`
     UPDATE negotiation_messages
-    SET approved = true, ai_draft = ${finalText}, sent_at = NOW()
+    SET approved = true, ai_draft = ${finalText}, sent_at = ${sent ? sql`NOW()` : null}
     WHERE id = ${messageId}
   `;
 
   // Save outbound message
   await sql`
     INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at)
-    VALUES (${msg.negotiation_id}, 'outbound', ${finalText}, true, NOW())
+    VALUES (${msg.negotiation_id}, 'outbound', ${plainText}, true, ${sent ? sql`NOW()` : null})
   `;
+
+  return NextResponse.json({ ok: true, sent });
+}
+
+// Resend an outbound message that failed to deliver
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
+  const { messageId } = await req.json();
+
+  const [msg] = await sql`
+    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email
+    FROM negotiation_messages nm
+    JOIN negotiations n ON n.id = nm.negotiation_id
+    WHERE nm.id = ${messageId}
+      AND nm.direction = 'outbound'
+      AND nm.approved = true
+      AND nm.sent_at IS NULL
+      AND n.clerk_user_id = ${userId}
+  `;
+  if (!msg) return NextResponse.json({ error: "Not found or already sent" }, { status: 404 });
+
+  if (!msg.counterparty_email) {
+    return NextResponse.json({ error: "No counterparty email set" }, { status: 400 });
+  }
+
+  const accessToken = await getAccessToken(userId);
+  if (!accessToken) return NextResponse.json({ error: "Gmail not connected" }, { status: 400 });
+
+  let sent = false;
+  try {
+    const subject = `Re: Negotiation - ${msg.address}`;
+    const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
+    const replyTo = msg.alias_email ?? undefined;
+    sent = await sendGmailLib(userId, msg.counterparty_email, subject, msg.content, fromAddress ?? undefined, replyTo);
+  } catch {
+    sent = false;
+  }
+
+  if (sent) {
+    await sql`UPDATE negotiation_messages SET sent_at = NOW() WHERE id = ${messageId}`;
+  }
 
   return NextResponse.json({ ok: true, sent });
 }

@@ -132,7 +132,7 @@ export default function DealPage() {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const sendEmailScript = () => {
+  const sendEmailScript = async () => {
     // Capture everything from the Email Script heading to the next ## heading or end
     const emailMatch = result.match(/#+[^#\n]*email script[^\n]*\n([\s\S]*?)(?=\n#+\s|$)/i);
     const rawText = (emailMatch ? emailMatch[1] : result).trim();
@@ -142,7 +142,12 @@ export default function DealPage() {
     const bodyText = stripped.replace(/^subject:[^\n]*\n*/im, "").replace(/^---\s*\n/m, "").trim().slice(0, 1800);
     const subject = encodeURIComponent(subjectLine);
     const body = encodeURIComponent(bodyText);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    const a = document.createElement("a");
+    a.href = `mailto:?subject=${subject}&body=${body}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    await navigator.clipboard.writeText(bodyText).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -388,7 +393,7 @@ export default function DealPage() {
                 Save as PDF
               </Button>
               <Button onClick={sendEmailScript}>
-                {copied ? "✓ Opening email app..." : "Send email script →"}
+                {copied ? "✓ Copied + opening email app..." : "Send email script →"}
               </Button>
             </div>
 

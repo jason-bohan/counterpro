@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const existingPlan = await getUserPlan(userId);
     const existingCustomerId = existingPlan?.stripe_customer_id;
     // Only reuse customer IDs that match the current mode (live vs test)
-    const isLive = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live");
+    const isLive = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live") || process.env.STRIPE_SECRET_KEY?.startsWith("rk_live");
     const customerIdValid = existingCustomerId &&
       (isLive ? existingCustomerId.startsWith("cus_") : true);
 

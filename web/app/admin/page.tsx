@@ -44,6 +44,7 @@ export default function AdminPage() {
 
   // Grant suite state
   const [suiteUserId, setSuiteUserId] = useState("");
+  const [suiteDays, setSuiteDays] = useState("14");
   const [suiteMsg, setSuiteMsg] = useState("");
 
   // Users tab state
@@ -103,8 +104,9 @@ export default function AdminPage() {
 
   const grantSuite = async () => {
     if (!suiteUserId.trim()) return;
-    const r = await api({ action: "grant_suite", clerk_user_id: suiteUserId });
-    setSuiteMsg(r.ok ? `✓ Suite plan granted to ${suiteUserId}` : r.error);
+    const r = await api({ action: "grant_suite", clerk_user_id: suiteUserId, trial_days: suiteDays ? Number(suiteDays) : null });
+    const label = suiteDays ? `${suiteDays}-day trial` : "permanent access";
+    setSuiteMsg(r.ok ? `✓ Suite ${label} granted to ${suiteUserId}` : r.error);
     setSuiteUserId(""); load();
   };
 
@@ -461,18 +463,6 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              {/* Grant suite */}
-              <Card>
-                <CardHeader><CardTitle className="text-base">Grant Suite plan</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">Manually grant suite access to a user (bypasses Stripe).</p>
-                  <div className="flex gap-3">
-                    <Input placeholder="user_2abc..." value={suiteUserId} onChange={e => setSuiteUserId(e.target.value)} className="max-w-xs" />
-                    <Button onClick={grantSuite} disabled={!suiteUserId.trim()}>Grant Suite</Button>
-                  </div>
-                  {suiteMsg && <p className="text-sm text-green-600">{suiteMsg}</p>}
-                </CardContent>
-              </Card>
             </div>
           );
         })()}
@@ -565,6 +555,27 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <Button onClick={grantCreditsToUser} disabled={!grantUserId.trim()}>Grant credits</Button>
                   {grantMsg && <p className="text-sm text-green-600">{grantMsg}</p>}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Grant Suite trial</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">Give a user free Suite access for a set number of days. Leave days blank for permanent access.</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2 space-y-1">
+                    <Label>Clerk user ID</Label>
+                    <Input placeholder="user_2abc..." value={suiteUserId} onChange={e => setSuiteUserId(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Trial days</Label>
+                    <Input type="number" min={1} placeholder="14" value={suiteDays} onChange={e => setSuiteDays(e.target.value)} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button onClick={grantSuite} disabled={!suiteUserId.trim()}>Grant Suite trial</Button>
+                  {suiteMsg && <p className="text-sm text-green-600">{suiteMsg}</p>}
                 </div>
               </CardContent>
             </Card>

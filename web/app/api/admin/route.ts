@@ -119,11 +119,17 @@ export async function POST(req: Request) {
   }
 
   if (action === "grant_suite") {
+    const trialDays = data.trial_days ? Number(data.trial_days) : null;
+    const subEnd = trialDays
+      ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString()
+      : null;
     await sql`
-      INSERT INTO user_plans (clerk_user_id, plan, deals_remaining)
-      VALUES (${data.clerk_user_id}, 'suite', 0)
+      INSERT INTO user_plans (clerk_user_id, plan, deals_remaining, subscription_end)
+      VALUES (${data.clerk_user_id}, 'suite', 0, ${subEnd})
       ON CONFLICT (clerk_user_id) DO UPDATE
-      SET plan = 'suite', updated_at = NOW()
+      SET plan = 'suite',
+          subscription_end = ${subEnd},
+          updated_at = NOW()
     `;
     return NextResponse.json({ ok: true });
   }

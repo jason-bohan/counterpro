@@ -83,6 +83,9 @@ export default function NegotiateThreadPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [aliasCopied, setAliasCopied] = useState(false);
 
+  // Resend
+  const [resending, setResending] = useState<number | null>(null);
+
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
 
@@ -173,6 +176,20 @@ export default function NegotiateThreadPage() {
     navigator.clipboard.writeText(editedDraft).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const resendMessage = async (messageId: number) => {
+    setResending(messageId);
+    try {
+      await fetch("/api/negotiate-suite", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      load();
+    } finally {
+      setResending(null);
+    }
   };
 
   const saveEmail = async () => {
@@ -475,7 +492,16 @@ export default function NegotiateThreadPage() {
                         <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
                       )}
                       {m.direction === "outbound" && !m.sent_at && m.approved && (
-                        <Badge variant="outline" className="text-xs h-4 shrink-0">Approved</Badge>
+                        <>
+                          <Badge variant="outline" className="text-xs h-4 shrink-0">Send failed</Badge>
+                          <button
+                            onClick={() => resendMessage(m.id)}
+                            disabled={resending === m.id}
+                            className="text-xs text-primary hover:underline disabled:opacity-50 shrink-0"
+                          >
+                            {resending === m.id ? "Sending..." : "Retry"}
+                          </button>
+                        </>
                       )}
                     </div>
                     <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
@@ -714,7 +740,7 @@ export default function NegotiateThreadPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-2xl font-bold">{messages.length}</p>
+                  <p className="text-2xl font-bold">{messages.filter(m => m.content !== "[First contact]").length}</p>
                   <p className="text-xs text-muted-foreground">Messages</p>
                 </div>
                 <div>
@@ -723,7 +749,7 @@ export default function NegotiateThreadPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {messages.filter(m => m.direction === "inbound").length}
+                    {messages.filter(m => m.direction === "inbound" && m.content !== "[First contact]").length}
                   </p>
                   <p className="text-xs text-muted-foreground">Received</p>
                 </div>

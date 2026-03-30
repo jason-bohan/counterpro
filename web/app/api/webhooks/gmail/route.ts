@@ -95,13 +95,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
 
   const routing = routeInboundEmail(fromHeader, toHeader);
 
-  if (routing.type === "loop") {
-    await wlog("message_skip", `msgId=${msgId} from=${fromHeader} (loop prevention)`, "skip");
-    return;
-  }
-
-  if (routing.type === "unrelated") {
-    await wlog("message_skip", `msgId=${msgId} to=${toHeader} from=${fromHeader} subject=${subjectHeader} (no alias match)`, "skip");
+  if (routing.type === "loop" || routing.type === "unrelated") {
     return;
   }
 
