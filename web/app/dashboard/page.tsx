@@ -9,7 +9,6 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { NotifyButton } from "@/components/notify-button";
 import { PromoCode } from "@/components/promo-code";
 
 type Deal = {
@@ -33,6 +32,14 @@ function DashboardInner() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const searchParams = useSearchParams();
   const paymentSuccess = searchParams.get("payment") === "success";
+
+  // Debug: Log user object to see its structure
+  console.log("User object:", user);
+  console.log("User firstName:", user?.firstName);
+  console.log("User fullName:", user?.fullName);
+  console.log("User username:", user?.username);
+  console.log("User emailAddresses:", user?.emailAddresses);
+  console.log("User primary email:", user?.emailAddresses?.[0]?.emailAddress);
 
   useEffect(() => {
     fetch("/api/deals")
@@ -78,7 +85,19 @@ function DashboardInner() {
                 {portalLoading ? "Loading..." : "Manage subscription"}
               </Button>
             )}
-            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
+            {user?.firstName ? (
+              <span className="text-sm text-muted-foreground">
+                {user.firstName}
+              </span>
+            ) : user?.username ? (
+              <span className="text-sm text-muted-foreground">
+                {user.username}
+              </span>
+            ) : user?.emailAddresses?.[0] ? (
+              <span className="text-sm text-muted-foreground">
+                {user.emailAddresses[0].emailAddress}
+              </span>
+            ) : null}
             <UserButton />
           </div>
         </div>
@@ -93,7 +112,7 @@ function DashboardInner() {
 
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : ""}
+            Welcome back{user?.firstName ? `, ${user.firstName}` : user?.username ? `, ${user.username}` : user?.emailAddresses?.[0] ? `, ${user.emailAddresses[0].emailAddress}` : ""}
           </h1>
           <p className="text-muted-foreground mt-1">Ready to negotiate your next deal?</p>
         </div>
