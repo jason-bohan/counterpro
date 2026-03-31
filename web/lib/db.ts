@@ -111,6 +111,21 @@ export async function setupDatabase() {
   await sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_message_id TEXT`;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS negotiation_documents (
+      id SERIAL PRIMARY KEY,
+      negotiation_id INTEGER NOT NULL REFERENCES negotiations(id) ON DELETE CASCADE,
+      clerk_user_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      blob_url TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER,
+      direction TEXT NOT NULL DEFAULT 'sent' CHECK (direction IN ('sent', 'received')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS docs_neg_idx ON negotiation_documents (negotiation_id, created_at DESC)`;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS webhook_logs (
       id SERIAL PRIMARY KEY,
       event_type TEXT NOT NULL,

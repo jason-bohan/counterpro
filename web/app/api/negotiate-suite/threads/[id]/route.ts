@@ -28,7 +28,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY due_date ASC
   `;
 
-  return NextResponse.json({ negotiation: neg, messages, deadlines });
+  const documents = await sql`
+    SELECT id, filename, blob_url, mime_type, size_bytes, direction, created_at
+    FROM negotiation_documents
+    WHERE negotiation_id = ${id}
+    ORDER BY created_at DESC
+  `;
+
+  return NextResponse.json({ negotiation: neg, messages, deadlines, documents });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

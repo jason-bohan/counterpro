@@ -28,6 +28,16 @@ type Deadline = {
   completed: boolean;
 };
 
+type NegotiationDocument = {
+  id: number;
+  filename: string;
+  blob_url: string;
+  mime_type: string;
+  size_bytes: number | null;
+  direction: "sent" | "received";
+  created_at: string;
+};
+
 type Negotiation = {
   id: number;
   address: string;
@@ -63,6 +73,7 @@ export default function NegotiateThreadPage() {
   const [negotiation, setNegotiation] = useState<Negotiation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [documents, setDocuments] = useState<NegotiationDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
@@ -76,6 +87,8 @@ export default function NegotiateThreadPage() {
   const [editedDraft, setEditedDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Counterparty email editing
   const [editingEmail, setEditingEmail] = useState(false);
@@ -116,14 +129,17 @@ export default function NegotiateThreadPage() {
         setNegotiation(d.negotiation ?? null);
         setMessages(d.messages ?? []);
         setDeadlines(d.deadlines ?? []);
+        setDocuments(d.documents ?? []);
         setEmailValue(d.negotiation?.counterparty_email ?? "");
-        // Restore pending draft from DB if one exists and hasn't been approved
+        // Sync pending draft from DB
         const pending = (d.messages ?? []).find(
           (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
         );
         if (pending) {
           setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
           setEditedDraft(pending.ai_draft!);
+        } else {
+          setPendingDraft(null);
         }
         setLoading(false);
       })
@@ -149,9 +165,15 @@ export default function NegotiateThreadPage() {
                 const pending = (d.messages ?? []).find(
                   (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
                 );
-                if (pending && !pendingDraft) {
-                  setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
-                  setEditedDraft(pending.ai_draft!);
+                if (pending) {
+                  setPendingDraft(prev =>
+                    prev?.messageId === pending.id ? prev : { draft: pending.ai_draft!, messageId: pending.id }
+                  );
+                  setEditedDraft(prev =>
+                    prev === (pendingDraft?.draft ?? "") ? pending.ai_draft! : prev
+                  );
+                } else {
+                  setPendingDraft(null);
                 }
                 return d.messages ?? [];
               }
@@ -193,12 +215,23 @@ export default function NegotiateThreadPage() {
     if (!pendingDraft) return;
     setSending(true);
     try {
-      await fetch("/api/negotiate-suite", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: pendingDraft.messageId, approved: true, editedDraft }),
-      });
+      let body: BodyInit;
+      let headers: Record<string, string> | undefined;
+      if (attachedFile) {
+        const form = new FormData();
+        form.append("messageId", String(pendingDraft.messageId));
+        form.append("approved", "true");
+        form.append("editedDraft", editedDraft);
+        form.append("attachment", attachedFile);
+        body = form;
+      } else {
+        body = JSON.stringify({ messageId: pendingDraft.messageId, approved: true, editedDraft });
+        headers = { "Content-Type": "application/json" };
+      }
+      await fetch("/api/negotiate-suite", { method: "PUT", headers, body });
       setPendingDraft(null);
+      setAttachedFile(null);
+      window.dispatchEvent(new Event("notifications-updated"));
       load();
     } finally {
       setSending(false);
@@ -590,7 +623,43 @@ export default function NegotiateThreadPage() {
                     <Button variant="outline" onClick={copyToClipboard}>
                       {copied ? "✓ Copied" : "Copy to clipboard"}
                     </Button>
-                    <Button variant="ghost" onClick={() => setPendingDraft(null)}>
+                    {/* File attachment */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.txt"
+                      onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
+                    />
+                    {attachedFile ? (
+                      <div className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 bg-muted/50">
+                        <span className="truncate max-w-[160px]">{attachedFile.name}</span>
+                        <button
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        Attach file
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        if (!pendingDraft) return;
+                        const id = pendingDraft.messageId;
+                        setPendingDraft(null);
+                        await fetch("/api/negotiate-suite", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ messageId: id, discard: true }),
+                        });
+                        window.dispatchEvent(new Event("notifications-updated"));
+                      }}
+                    >
                       Discard
                     </Button>
                   </div>
@@ -884,6 +953,41 @@ export default function NegotiateThreadPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Documents */}
+            {documents.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {documents.map(doc => (
+                    <a
+                      key={doc.id}
+                      href={doc.blob_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
+                    >
+                      <span className="text-base shrink-0">
+                        {doc.mime_type === "application/pdf" ? "📄" : "📎"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
+                          {doc.filename}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
+                          {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
+                        </p>
+                      </div>
+                    </a>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
           </div>
         </div>

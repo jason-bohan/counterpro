@@ -81,6 +81,12 @@ export async function refreshGmailToken(userId: string): Promise<string | null> 
   return newAccessToken;
 }
 
+export type GmailAttachment = {
+  name: string;
+  mimeType: string;
+  data: Buffer;
+};
+
 export async function sendGmail(
   userId: string,
   to: string,
@@ -90,7 +96,8 @@ export async function sendGmail(
   replyTo?: string,
   html?: string,
   threadId?: string,
-  inReplyTo?: string
+  inReplyTo?: string,
+  attachments?: GmailAttachment[]
 ): Promise<boolean> {
   let token = await getGmailToken(userId);
   if (!token) {
@@ -112,43 +119,64 @@ export async function sendGmail(
   // Encode subject for non-ASCII characters (RFC 2047)
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
 
-  const emailLines: string[] = [];
-  if (from) {
-    emailLines.push(`From: ${from}`);
-  }
-  emailLines.push(`To: ${to}`);
-  if (replyTo) {
-    emailLines.push(`Reply-To: ${replyTo}`);
-  }
+  const headers: string[] = [];
+  if (from) headers.push(`From: ${from}`);
+  headers.push(`To: ${to}`);
+  if (replyTo) headers.push(`Reply-To: ${replyTo}`);
   if (inReplyTo) {
-    emailLines.push(`In-Reply-To: ${inReplyTo}`);
-    emailLines.push(`References: ${inReplyTo}`);
+    headers.push(`In-Reply-To: ${inReplyTo}`);
+    headers.push(`References: ${inReplyTo}`);
   }
-  if (html) {
-    emailLines.push(
-      `Subject: ${encodedSubject}`,
-      `MIME-Version: 1.0`,
-      `Content-Type: multipart/alternative; boundary="boundary_cp"`,
-      ``,
-      `--boundary_cp`,
+  headers.push(`Subject: ${encodedSubject}`, `MIME-Version: 1.0`);
+
+  const hasAttachments = attachments && attachments.length > 0;
+
+  let bodySection: string;
+  if (hasAttachments) {
+    // multipart/mixed wraps the text body + each attachment
+    const boundary = "boundary_mixed_cp";
+    const textPart = [
+      `--${boundary}`,
       `Content-Type: text/plain; charset=utf-8`,
       ``,
       body,
-      `--boundary_cp`,
+    ].join("\r\n");
+    const attachParts = attachments!.map(att => [
+      `--${boundary}`,
+      `Content-Type: ${att.mimeType}; name="${att.name}"`,
+      `Content-Transfer-Encoding: base64`,
+      `Content-Disposition: attachment; filename="${att.name}"`,
+      ``,
+      att.data.toString("base64"),
+    ].join("\r\n")).join("\r\n");
+
+    bodySection = [
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      ``,
+      textPart,
+      attachParts,
+      `--${boundary}--`,
+    ].join("\r\n");
+  } else if (html) {
+    const boundary = "boundary_alt_cp";
+    bodySection = [
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      ``,
+      body,
+      `--${boundary}`,
       `Content-Type: text/html; charset=utf-8`,
       ``,
       html,
-      `--boundary_cp--`,
-    );
+      `--${boundary}--`,
+    ].join("\r\n");
   } else {
-    emailLines.push(
-      `Subject: ${encodedSubject}`,
-      `Content-Type: text/plain; charset=utf-8`,
-      ``,
-      body,
-    );
+    bodySection = [`Content-Type: text/plain; charset=utf-8`, ``, body].join("\r\n");
   }
-  const raw = Buffer.from(emailLines.join("\r\n"), "utf8").toString("base64url");
+
+  const raw = Buffer.from([...headers, "", bodySection].join("\r\n"), "utf8").toString("base64url");
 
   const sendPayload: Record<string, string> = { raw };
   if (threadId) sendPayload.threadId = threadId;

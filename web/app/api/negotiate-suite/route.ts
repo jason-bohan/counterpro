@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
-import { getAccessToken, sendGmail as sendGmailLib } from "@/lib/gmail";
+import { getAccessToken, sendGmail as sendGmailLib, type GmailAttachment } from "@/lib/gmail";
+import { put } from "@vercel/blob";
 import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 
@@ -65,7 +66,29 @@ export async function PUT(req: NextRequest) {
   const allowed = await canUserRunSuite(userId);
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
-  const { messageId, approved, editedDraft } = await req.json();
+  // Accept either JSON or multipart/form-data (when a file attachment is included)
+  let messageId: number, approved: boolean, editedDraft: string, discard: boolean;
+  let attachment: GmailAttachment | undefined;
+
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const form = await req.formData();
+    messageId = Number(form.get("messageId"));
+    approved = form.get("approved") === "true";
+    editedDraft = (form.get("editedDraft") as string) ?? "";
+    discard = form.get("discard") === "true";
+    const file = form.get("attachment") as File | null;
+    if (file && file.size > 0) {
+      const bytes = await file.arrayBuffer();
+      attachment = {
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        data: Buffer.from(bytes),
+      };
+    }
+  } else {
+    ({ messageId, approved, editedDraft, discard } = await req.json());
+  }
 
   // Verify ownership
   const [msg] = await sql`
@@ -75,6 +98,12 @@ export async function PUT(req: NextRequest) {
     WHERE nm.id = ${messageId} AND n.clerk_user_id = ${userId}
   `;
   if (!msg) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Discard: mark as approved without sending so it disappears from the pending queue
+  if (discard) {
+    await sql`UPDATE negotiation_messages SET approved = true WHERE id = ${messageId}`;
+    return NextResponse.json({ ok: true, sent: false });
+  }
 
   const finalText = editedDraft || msg.ai_draft;
   const plainText = stripAiPreamble(stripMarkdown(finalText));
@@ -101,6 +130,7 @@ export async function PUT(req: NextRequest) {
           undefined,
           msg.gmail_thread_id ?? undefined,
           msg.gmail_message_id ?? undefined,
+          attachment ? [attachment] : undefined,
         );
       } catch {
         // Gmail failure must not block approval
@@ -120,6 +150,24 @@ export async function PUT(req: NextRequest) {
     INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at)
     VALUES (${msg.negotiation_id}, 'outbound', ${plainText}, true, ${sent ? sql`NOW()` : null})
   `;
+
+  // Save attachment to Blob and record it so users can access sent documents later
+  if (sent && attachment) {
+    try {
+      const blobPath = `documents/${userId}/${msg.negotiation_id}/${Date.now()}-${attachment.name}`;
+      const { url } = await put(blobPath, attachment.data, {
+        access: "public",
+        contentType: attachment.mimeType,
+      });
+      await sql`
+        INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction)
+        VALUES (${msg.negotiation_id}, ${userId}, ${attachment.name}, ${url}, ${attachment.mimeType}, ${attachment.data.length}, 'sent')
+      `;
+    } catch (err) {
+      // Document storage failure must not block the response
+      console.error("[negotiate-suite] Failed to save document to blob:", err);
+    }
+  }
 
   return NextResponse.json({ ok: true, sent });
 }

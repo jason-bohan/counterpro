@@ -53,7 +53,14 @@ export function AppHeader({ right, nav = [] }: AppHeaderProps) {
     };
     load();
     const interval = setInterval(load, 30_000);
-    return () => { cancelled = true; clearInterval(interval); };
+    // Immediately refresh when a message is approved or discarded anywhere in the app
+    const onUpdate = () => load();
+    window.addEventListener("notifications-updated", onUpdate);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("notifications-updated", onUpdate);
+    };
   }, [pathname]);
 
   const navLinks = nav.map(item => (

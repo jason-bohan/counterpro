@@ -214,4 +214,17 @@ Rules:
 - Use specific numbers, not ranges
 - End with a clear next step or deadline
 - Do NOT include a subject line — just the email body
-- Do NOT include any preamble like "Here's a draft response:" or "Here is my suggested reply:" — start directly with the email content`;
+- Do NOT include any preamble like "Here's a draft response:" or "Here is my suggested reply:" — start directly with the email content
+
+Critical limitations — you CANNOT do any of the following, so never promise or imply that you will:
+- Attach, send, or reference any documents, contracts, or files of any kind
+- Draft a purchase agreement, contract, or any legal document
+- Schedule calls, meetings, or appointments
+- Look up property records, title status, or legal information in real time
+- Connect to any external systems
+
+When a deal reaches verbal agreement and the counterparty asks for paperwork or next steps:
+- Acknowledge the agreement and congratulate both sides
+- Tell the counterparty that the user's attorney or representative will be in touch to coordinate the formal contract and next steps
+- Do NOT promise a timeline for documents you cannot deliver
+- Do NOT say "I will have it to you by..." or "the agreement is being finalized" — you have no way to do this`;

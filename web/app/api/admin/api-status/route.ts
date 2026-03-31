@@ -93,6 +93,23 @@ async function checkStripe(): Promise<ApiCheck> {
   };
 }
 
+function checkBlob(): ApiCheck {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    return {
+      name: "Vercel Blob (Documents)",
+      status: "error",
+      detail: "BLOB_READ_WRITE_TOKEN not set",
+      hint: "Document attachments won't be saved — connect Blob store in Vercel dashboard",
+    };
+  }
+  return {
+    name: "Vercel Blob (Documents)",
+    status: "ok",
+    detail: `Token set (${token.slice(0, 16)}…)`,
+  };
+}
+
 function checkResend(): ApiCheck {
   const apiKey = process.env.RESEND_API_KEY;
   const fromAddress = process.env.RESEND_FROM_ADDRESS;
@@ -173,6 +190,7 @@ export async function GET() {
     checkClerk(),
     checkResend(),
     checkGmail(),
+    checkBlob(),
     checkEnvKey("Rentcast (Property Data)", "RENTCAST_API_KEY", { warnIfMissing: true }),
   ];
 
