@@ -630,47 +630,76 @@ export default function NegotiateThreadPage() {
                 </Card>
               )}
 
-              {messages.filter(m => m.content !== "[First contact]").map(m => (
-                <div
-                  key={m.id}
-                  className={`flex ${m.direction === "outbound" || m.direction === "proactive" ? "justify-end" : "justify-start"}`}
-                >
+              {messages.filter(m => m.content !== "[First contact]").map(m => {
+                const messageDocuments = documents.filter(doc => {
+                  const docTime = new Date(doc.created_at).getTime();
+                  const msgTime = new Date(m.created_at).getTime();
+                  const timeDiff = Math.abs(docTime - msgTime);
+                  return timeDiff < 5000 && doc.direction === (m.direction === "outbound" || m.direction === "proactive" ? "sent" : "received");
+                });
+                return (
                   <div
-                    className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                      m.direction === "outbound" || m.direction === "proactive"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card border text-foreground"
-                    }`}
+                    key={m.id}
+                    className={`flex ${m.direction === "outbound" || m.direction === "proactive" ? "justify-end" : "justify-start"}`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs opacity-60">
-                        {m.direction === "proactive" || m.direction === "outbound" ? "You" : "Counterparty"}
-                        {" · "}
-                        {relativeTime(m.created_at)}
-                      </span>
-                      {(m.direction === "outbound" || (m.direction === "proactive" && m.ai_draft && m.ai_draft !== m.content)) && (
-                        <Badge variant="secondary" className="text-xs h-4 shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30">AI</Badge>
-                      )}
-                      {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
-                        <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
-                      )}
-                      {(m.direction === "outbound" || m.direction === "proactive") && !m.sent_at && m.approved && (
-                        <>
-                          <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
-                          <button
-                            onClick={() => resendMessage(m.id)}
-                            disabled={resending === m.id}
-                            className="text-xs text-primary-foreground/70 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 shrink-0"
-                          >
-                            {resending === m.id ? "Sending..." : "Retry"}
-                          </button>
-                        </>
+                    <div
+                      className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                        m.direction === "outbound" || m.direction === "proactive"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card border text-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs opacity-60">
+                          {m.direction === "proactive" || m.direction === "outbound" ? "You" : "Counterparty"}
+                          {" · "}
+                          {relativeTime(m.created_at)}
+                        </span>
+                        {(m.direction === "outbound" || (m.direction === "proactive" && m.ai_draft && m.ai_draft !== m.content)) && (
+                          <Badge variant="secondary" className="text-xs h-4 shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30">AI</Badge>
+                        )}
+                        {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
+                          <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
+                        )}
+                        {(m.direction === "outbound" || m.direction === "proactive") && !m.sent_at && m.approved && (
+                          <>
+                            <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
+                            <button
+                              onClick={() => resendMessage(m.id)}
+                              disabled={resending === m.id}
+                              className="text-xs text-primary-foreground/70 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 shrink-0"
+                            >
+                              {resending === m.id ? "Sending..." : "Retry"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                      {messageDocuments.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-current border-opacity-20">
+                          {messageDocuments.map(doc => (
+                            <a
+                              key={doc.id}
+                              href={doc.blob_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                                m.direction === "outbound" || m.direction === "proactive"
+                                  ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
+                                  : "bg-muted hover:bg-muted/80 text-foreground"
+                              }`}
+                              title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
+                            >
+                              <span className="text-sm">{doc.mime_type === "application/pdf" ? "📄" : "📎"}</span>
+                              <span className="truncate">{doc.filename}</span>
+                            </a>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div ref={bottomRef} />
             </div>

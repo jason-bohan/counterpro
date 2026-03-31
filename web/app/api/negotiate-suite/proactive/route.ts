@@ -90,23 +90,10 @@ export async function POST(req: NextRequest) {
 
     console.log("Proactive API: Message saved:", savedMsg.id);
 
-    // Handle attachment if provided
+    // Note: We don't handle attachment here - let the PUT route handle it properly
+    // The attachment will be processed when the message is approved/sent via PUT
     if (attachment) {
-      try {
-        console.log("Proactive API: Processing attachment:", attachment.name);
-        // For now, we'll store the attachment info in the message content
-        // In a full implementation, you'd upload to blob storage here
-        const attachmentInfo = `[Attachment: ${attachment.name} (${attachment.size} bytes, ${attachment.type})]`;
-        await sql`
-          UPDATE negotiation_messages 
-          SET content = ${message + '\n\n' + attachmentInfo}
-          WHERE id = ${savedMsg.id}
-        `;
-        console.log("Proactive API: Attachment processed");
-      } catch (error) {
-        console.error("Proactive API: Failed to process attachment:", error);
-        // Continue without attachment - don't fail the whole request
-      }
+      console.log("Proactive API: Attachment detected, will be processed by PUT route:", attachment.name);
     }
 
     await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
