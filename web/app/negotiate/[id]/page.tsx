@@ -249,6 +249,62 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const quickSendProactive = async () => {
+    if (!proactiveMsg.trim() || !id) return;
+    setProactiveDrafting(true);
+    try {
+      const formData = new FormData();
+      formData.append("negotiationId", id.toString());
+      formData.append("message", proactiveMsg);
+      if (proactiveAttachment) {
+        formData.append("attachment", proactiveAttachment);
+      }
+
+      const res = await fetch("/api/negotiate-suite/proactive", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.status === 403) { setAccessDenied(true); return; }
+      const { draft, messageId } = await res.json();
+      
+      // Auto-approve and send without review
+      let sendBody: BodyInit;
+      let sendHeaders: Record<string, string> | undefined;
+      if (proactiveAttachment) {
+        const sendForm = new FormData();
+        sendForm.append("messageId", String(messageId));
+        sendForm.append("approved", "true");
+        sendForm.append("editedDraft", draft);
+        sendForm.append("attachment", proactiveAttachment);
+        sendBody = sendForm;
+      } else {
+        sendBody = JSON.stringify({ 
+          messageId, 
+          approved: "true", 
+          editedDraft: draft 
+        });
+        sendHeaders = { "Content-Type": "application/json" };
+      }
+      
+      await fetch("/api/negotiate-suite", { 
+        method: "PUT", 
+        headers: sendHeaders,
+        body: sendBody
+      });
+      
+      setProactiveMsg("");
+      setProactiveAttachment(null);
+      setShowProactive(false);
+      // Clear file input
+      const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+      window.dispatchEvent(new Event("notifications-updated"));
+    } finally {
+      setProactiveDrafting(false);
+      load();
+    }
+  };
+
   const approveAndSend = async () => {
     if (!pendingDraft) return;
     setSending(true);
@@ -821,6 +877,7 @@ export default function NegotiateThreadPage() {
                         <Button
                           onClick={submitProactive}
                           disabled={proactiveDrafting || !proactiveMsg.trim()}
+                          variant="outline"
                         >
                           {proactiveDrafting ? (
                             <span className="flex items-center gap-2">
@@ -828,6 +885,17 @@ export default function NegotiateThreadPage() {
                               AI is refining...
                             </span>
                           ) : "Refine with AI →"}
+                        </Button>
+                        <Button
+                          onClick={quickSendProactive}
+                          disabled={proactiveDrafting || !proactiveMsg.trim()}
+                        >
+                          {proactiveDrafting ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              Sending...
+                            </span>
+                          ) : "Quick Send"}
                         </Button>
                         <Button variant="ghost" onClick={() => { 
                           setShowProactive(false); 

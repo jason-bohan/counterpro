@@ -47,10 +47,10 @@ export async function POST(req: NextRequest) {
 
   const draft = claudeMessage.content[0].type === "text" ? claudeMessage.content[0].text : "";
 
-  // Save proactive message + draft
+  // Save proactive message + draft as outbound (from user's perspective)
   const [savedMsg] = await sql`
     INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft)
-    VALUES (${negotiationId}, 'proactive', ${message}, ${draft})
+    VALUES (${negotiationId}, 'outbound', ${message}, ${draft})
     RETURNING id
   `;
 
