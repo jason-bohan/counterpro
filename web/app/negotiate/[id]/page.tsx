@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 
 type Message = {
   id: number;
@@ -367,24 +367,10 @@ export default function NegotiateThreadPage() {
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
-      {/* Header */}
-      <header className="border-b bg-background sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <Logo size={36} href="/" />
-            <Link
-              href="/negotiate"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              ← All negotiations
-            </Link>
-            <span className="text-muted-foreground hidden sm:inline">/</span>
-            <div className="hidden sm:flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm truncate max-w-xs">{negotiation.address}</span>
-              <Badge variant="secondary" className="text-xs capitalize shrink-0">{negotiation.role}</Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
+      <AppHeader
+        nav={[{ label: "← All negotiations", href: "/negotiate" }]}
+        right={
+          <div className="flex items-center gap-2">
             {negotiation.autonomous_mode && (
               <Badge className="text-xs bg-violet-100 text-violet-800 border border-violet-200" variant="outline">
                 Auto-pilot ON
@@ -404,8 +390,8 @@ export default function NegotiateThreadPage() {
               Archive
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 flex-1 w-full">
         {/* Mobile title */}

@@ -93,12 +93,30 @@ async function checkStripe(): Promise<ApiCheck> {
   };
 }
 
+function checkResend(): ApiCheck {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromAddress = process.env.RESEND_FROM_ADDRESS;
+  if (!apiKey) {
+    return {
+      name: "Resend (Notification Email)",
+      status: "error",
+      detail: "RESEND_API_KEY not set",
+      hint: "Owner notification emails (draft ready, autonomous update) won't send",
+    };
+  }
+  return {
+    name: "Resend (Notification Email)",
+    status: "ok",
+    detail: `Key set (${apiKey.slice(0, 8)}…) · from: ${fromAddress ?? "notifications@counterproai.com (default)"}`,
+  };
+}
+
 function checkGmail(): ApiCheck {
   const systemUserId = process.env.GMAIL_SYSTEM_USER_ID;
   const salesAddress = process.env.GMAIL_SALES_ADDRESS;
   if (!systemUserId && !salesAddress) {
     return {
-      name: "Gmail (System Account)",
+      name: "Gmail (Negotiation Emails)",
       status: "warn",
       detail: "GMAIL_SYSTEM_USER_ID and GMAIL_SALES_ADDRESS not set",
       hint: "System Gmail fallback won't work — users must connect their own Gmail",
@@ -108,7 +126,7 @@ function checkGmail(): ApiCheck {
   if (systemUserId) parts.push(`system user: ${systemUserId.slice(0, 12)}…`);
   if (salesAddress) parts.push(`from: ${salesAddress}`);
   return {
-    name: "Gmail (System Account)",
+    name: "Gmail (Negotiation Emails)",
     status: "ok",
     detail: parts.join(" · "),
   };
@@ -153,6 +171,7 @@ export async function GET() {
     anthropic,
     stripe,
     checkClerk(),
+    checkResend(),
     checkGmail(),
     checkEnvKey("Rentcast (Property Data)", "RENTCAST_API_KEY", { warnIfMissing: true }),
   ];

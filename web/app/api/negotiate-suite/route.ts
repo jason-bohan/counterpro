@@ -91,7 +91,17 @@ export async function PUT(req: NextRequest) {
         const subject = `Re: Negotiation - ${msg.address}`;
         const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
         const replyTo = msg.alias_email ?? undefined;
-        sent = await sendGmailLib(sendAsUserId, msg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
+        sent = await sendGmailLib(
+          sendAsUserId,
+          msg.counterparty_email,
+          subject,
+          plainText,
+          fromAddress ?? undefined,
+          replyTo,
+          undefined,
+          msg.gmail_thread_id ?? undefined,
+          msg.gmail_message_id ?? undefined,
+        );
       } catch {
         // Gmail failure must not block approval
         sent = false;
@@ -148,12 +158,30 @@ export async function PATCH(req: NextRequest) {
   const accessToken = await getAccessToken(sendAsUserId);
   if (!accessToken) return NextResponse.json({ error: "Gmail not connected" }, { status: 400 });
 
+  // Find threading data from the most recent inbound message for this negotiation
+  const [threadSource] = await sql`
+    SELECT gmail_thread_id, gmail_message_id FROM negotiation_messages
+    WHERE negotiation_id = ${msg.negotiation_id} AND direction = 'inbound'
+      AND gmail_thread_id IS NOT NULL
+    ORDER BY created_at DESC LIMIT 1
+  `;
+
   let sent = false;
   try {
     const subject = `Re: Negotiation - ${msg.address}`;
     const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
     const replyTo = msg.alias_email ?? undefined;
-    sent = await sendGmailLib(sendAsUserId, msg.counterparty_email, subject, msg.content, fromAddress ?? undefined, replyTo);
+    sent = await sendGmailLib(
+      sendAsUserId,
+      msg.counterparty_email,
+      subject,
+      msg.content,
+      fromAddress ?? undefined,
+      replyTo,
+      undefined,
+      threadSource?.gmail_thread_id ?? undefined,
+      threadSource?.gmail_message_id ?? undefined,
+    );
   } catch {
     sent = false;
   }

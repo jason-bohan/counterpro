@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 
 type Thread = {
   id: number;
@@ -149,22 +149,12 @@ export default function NegotiateSuitePage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Logo size={44} href="/" />
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/archive" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Archive
-            </Link>
-            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
-            <UserButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        nav={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Archive", href: "/archive" },
+        ]}
+      />
 
       <main className="max-w-5xl mx-auto px-8 py-10">
         {/* Hero */}
