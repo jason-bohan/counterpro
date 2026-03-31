@@ -47,3 +47,4 @@ process.env.STRIPE_SECRET_KEY = "sk_test_123";
 process.env.STRIPE_SUBSCRIPTION_PRICE_ID = "price_test_subscription";
 process.env.STRIPE_SUITE_PRICE_ID = "price_test_suite";
 process.env.STRIPE_SINGLE_PRICE_ID = "price_test_single";
+process.env.BLOB_READ_WRITE_TOKEN = "blob_test_token_123";

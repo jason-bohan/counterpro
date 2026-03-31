@@ -69,6 +69,15 @@ vi.mock("@vercel/blob", () => ({
   put: mockBlobPut,
 }));
 
+// Add a simple test to verify the mock is working
+it("verifies blob mock is working", async () => {
+  mockBlobPut.mockResolvedValue({ url: "test-url" });
+  const { put } = await import("@vercel/blob");
+  const result = await put("test-path", Buffer.from("test"), { access: "public" });
+  expect(result.url).toBe("test-url");
+  expect(mockBlobPut).toHaveBeenCalled();
+});
+
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = { create: vi.fn().mockResolvedValue({ content: [] }) };
@@ -191,6 +200,7 @@ describe("negotiate-suite PUT — file attachment", () => {
   it("sends the email with an attachment when a file is included", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
+    mockBlobPut.mockResolvedValue({ url: "https://mock-blob-url.com/file.pdf" });
 
     await PUT(makeFormRequest(
       { messageId: "99", approved: "true", editedDraft: "Please see attached." },
@@ -209,6 +219,7 @@ describe("negotiate-suite PUT — file attachment", () => {
   it("uploads the file to Blob after a successful send", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
+    mockBlobPut.mockResolvedValue({ url: "https://mock-blob-url.com/file.pdf" });
 
     await PUT(makeFormRequest(
       { messageId: "99", approved: "true", editedDraft: "" },
@@ -238,16 +249,17 @@ describe("negotiate-suite PUT — file attachment", () => {
   it("still returns ok if Blob upload throws — send is not blocked", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
-    mockBlobPut.mockRejectedValue(new Error("Blob unavailable"));
+    mockBlobPut.mockRejectedValue(new Error("Blob service unavailable"));
 
-    const res = await PUT(makeFormRequest(
+    const response = await PUT(makeFormRequest(
       { messageId: "99", approved: "true", editedDraft: "" },
       { name: "agreement.pdf", type: "application/pdf", content: "%PDF-1.4 test" },
     ));
-    const json = await res.json();
 
-    expect(json.sent).toBe(true);
-    expect(res.status).toBe(200);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.sent).toBe(true);
   });
 
   it("sends normally without attachment when no file provided", async () => {
