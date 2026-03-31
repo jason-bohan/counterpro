@@ -236,6 +236,7 @@ export default function NegotiateThreadPage() {
       const { draft, messageId } = await res.json();
       setPendingDraft({ draft, messageId });
       setEditedDraft(draft);
+      setAttachedFile(proactiveAttachment); // Transfer attachment to Gmail sending state
       setProactiveMsg("");
       setProactiveAttachment(null);
       setShowProactive(false);
@@ -689,6 +690,7 @@ export default function NegotiateThreadPage() {
                         if (!pendingDraft) return;
                         const id = pendingDraft.messageId;
                         setPendingDraft(null);
+                        setAttachedFile(null);
                         await fetch("/api/negotiate-suite", {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
@@ -810,7 +812,7 @@ export default function NegotiateThreadPage() {
                         </div>
                         {proactiveAttachment && (
                           <p className="text-xs text-muted-foreground">
-                            Document will be attached to the refined message
+                            Document will be attached to the Gmail thread when sent
                           </p>
                         )}
                       </div>
