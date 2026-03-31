@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,11 @@ export default function NegotiateThreadPage() {
   const [newMsg, setNewMsg] = useState("");
   const [drafting, setDrafting] = useState(false);
 
+  // Proactive message input
+  const [showProactive, setShowProactive] = useState(false);
+  const [proactiveMsg, setProactiveMsg] = useState("");
+  const [proactiveDrafting, setProactiveDrafting] = useState(false);
+
   // Draft approval
   const [pendingDraft, setPendingDraft] = useState<{ draft: string; messageId: number } | null>(null);
   const [editedDraft, setEditedDraft] = useState("");
@@ -118,7 +123,7 @@ export default function NegotiateThreadPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     fetch(`/api/negotiate-suite/threads/${id}`)
       .then(r => {
         if (r.status === 403) { setAccessDenied(true); return null; }
@@ -144,9 +149,9 @@ export default function NegotiateThreadPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  };
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   // Poll for new inbound messages every 20 seconds.
   // Skips the poll while the user is actively editing a draft to avoid disrupting their work.
@@ -207,6 +212,27 @@ export default function NegotiateThreadPage() {
       setShowInbound(false);
     } finally {
       setDrafting(false);
+      load();
+    }
+  };
+
+  const submitProactive = async () => {
+    if (!proactiveMsg.trim()) return;
+    setProactiveDrafting(true);
+    try {
+      const res = await fetch("/api/negotiate-suite/proactive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ negotiationId: id, message: proactiveMsg }),
+      });
+      if (res.status === 403) { setAccessDenied(true); return; }
+      const { draft, messageId } = await res.json();
+      setPendingDraft({ draft, messageId });
+      setEditedDraft(draft);
+      setProactiveMsg("");
+      setShowProactive(false);
+    } finally {
+      setProactiveDrafting(false);
       load();
     }
   };
@@ -674,12 +700,17 @@ export default function NegotiateThreadPage() {
 
             {/* Add their message */}
             {!pendingDraft && (
-              <div>
-                {!showInbound ? (
-                  <Button variant="outline" onClick={() => setShowInbound(true)}>
-                    + Add their message
-                  </Button>
-                ) : (
+              <div className="flex flex-col gap-2">
+                {!showInbound && !showProactive ? (
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowInbound(true)}>
+                      + Add their message
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowProactive(true)}>
+                      + Compose new message
+                    </Button>
+                  </div>
+                ) : showInbound ? (
                   <Card>
                     <CardHeader className="pb-2 pt-4">
                       <CardTitle className="text-base">Paste the counterparty&apos;s latest message</CardTitle>
@@ -706,6 +737,38 @@ export default function NegotiateThreadPage() {
                           ) : "Get AI response →"}
                         </Button>
                         <Button variant="ghost" onClick={() => { setShowInbound(false); setNewMsg(""); }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardHeader className="pb-2 pt-4">
+                      <CardTitle className="text-base">Compose a new message</CardTitle>
+                      <p className="text-sm text-muted-foreground">AI will refine your message for review.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Textarea
+                        rows={5}
+                        placeholder="Type your message here... (e.g. 'I want to offer $350k' or 'Can we schedule a viewing?')"
+                        value={proactiveMsg}
+                        onChange={e => setProactiveMsg(e.target.value)}
+                        autoFocus
+                      />
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={submitProactive}
+                          disabled={proactiveDrafting || !proactiveMsg.trim()}
+                        >
+                          {proactiveDrafting ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              AI is refining...
+                            </span>
+                          ) : "Refine with AI →"}
+                        </Button>
+                        <Button variant="ghost" onClick={() => { setShowProactive(false); setProactiveMsg(""); }}>
                           Cancel
                         </Button>
                       </div>

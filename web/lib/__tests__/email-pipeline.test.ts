@@ -8,6 +8,7 @@ import {
   parseEmail,
   routeInboundEmail,
   buildNegotiationPrompt,
+  buildProactivePrompt,
   stripMarkdown,
   type GmailMessagePart,
 } from "../email-pipeline";
@@ -323,5 +324,78 @@ describe("stripMarkdown", () => {
     expect(result).toContain("cannot");
     expect(result).toContain("300,000");
     expect(result).toContain("Friday");
+  });
+});
+
+// ── buildProactivePrompt ─────────────────────────────────────────────────────
+
+describe("buildProactivePrompt", () => {
+  it("includes property address", () => {
+    const prompt = buildProactivePrompt("123 Main St", [], "I want to offer $280k");
+    expect(prompt).toContain("123 Main St");
+  });
+
+  it("shows no prior messages when history is empty", () => {
+    const prompt = buildProactivePrompt("123 Main St", [], "First proactive message");
+    expect(prompt).toContain("(No prior messages)");
+  });
+
+  it("includes the user's proactive message in quotes", () => {
+    const prompt = buildProactivePrompt("123 Main St", [], "I want to offer $280k");
+    expect(prompt).toContain('"I want to offer $280k"');
+  });
+
+  it("formats inbound messages as COUNTERPARTY", () => {
+    const history = [{ direction: "inbound", content: "We offer $280k" }];
+    const prompt = buildProactivePrompt("123 Main St", history, "I want to counter");
+    expect(prompt).toContain("[COUNTERPARTY]: We offer $280k");
+  });
+
+  it("formats outbound messages as YOU", () => {
+    const history = [{ direction: "outbound", content: "We need at least $300k" }];
+    const prompt = buildProactivePrompt("123 Main St", history, "Let's meet in the middle");
+    expect(prompt).toContain("[YOU]: We need at least $300k");
+  });
+
+  it("orders full conversation correctly before user message", () => {
+    const history = [
+      { direction: "inbound", content: "Offer $280k" },
+      { direction: "outbound", content: "Counter $310k" },
+      { direction: "inbound", content: "How about $295k?" },
+    ];
+    const prompt = buildProactivePrompt("123 Main St", history, "I accept $295k");
+    const counterpartyIdx = prompt.indexOf("[COUNTERPARTY]: Offer $280k");
+    const youIdx = prompt.indexOf("[YOU]: Counter $310k");
+    const secondIdx = prompt.indexOf("[COUNTERPARTY]: How about $295k?");
+    const userMsgIdx = prompt.indexOf("I accept $295k");
+    expect(counterpartyIdx).toBeLessThan(youIdx);
+    expect(youIdx).toBeLessThan(secondIdx);
+    expect(secondIdx).toBeLessThan(userMsgIdx);
+  });
+
+  it("includes instructions for refining the message", () => {
+    const prompt = buildProactivePrompt("123 Main St", [], "Offer $250k");
+    expect(prompt).toContain("Refine this message into a professional, strategic email");
+    expect(prompt).toContain("Maintains the professional tone");
+    expect(prompt).toContain("concise and impactful");
+    expect(prompt).toContain("clear next step");
+  });
+
+  it("handles complex user messages", () => {
+    const userMessage = "I think we should meet in person to discuss the property, maybe this weekend? I'm flexible on price but need quick closing.";
+    const prompt = buildProactivePrompt("123 Main St", [], userMessage);
+    expect(prompt).toContain(userMessage);
+    expect(prompt).toContain("professional, strategic email");
+  });
+
+  it("works with existing conversation context", () => {
+    const history = [
+      { direction: "inbound", content: "Is the property still available?" },
+      { direction: "outbound", content: "Yes, it is. Are you interested in viewing?" },
+    ];
+    const prompt = buildProactivePrompt("123 Main St", history, "I'd like to schedule a viewing for Saturday afternoon");
+    expect(prompt).toContain("[COUNTERPARTY]: Is the property still available?");
+    expect(prompt).toContain("[YOU]: Yes, it is. Are you interested in viewing?");
+    expect(prompt).toContain("schedule a viewing for Saturday afternoon");
   });
 });

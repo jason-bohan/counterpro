@@ -99,7 +99,7 @@ export async function sendGmail(
   inReplyTo?: string,
   attachments?: GmailAttachment[]
 ): Promise<boolean> {
-  let token = await getGmailToken(userId);
+  const token = await getGmailToken(userId);
   if (!token) {
     console.error(`[sendGmail] No Gmail token found for user=${userId}`);
     return false;
@@ -147,7 +147,7 @@ export async function sendGmail(
       `Content-Transfer-Encoding: base64`,
       `Content-Disposition: attachment; filename="${att.name}"`,
       ``,
-      att.data.toString("base64"),
+      att.data.toString("base64").match(/.{1,76}/g)?.join("\r\n") || att.data.toString("base64"),
     ].join("\r\n")).join("\r\n");
 
     bodySection = [

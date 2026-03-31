@@ -160,6 +160,32 @@ ${newMessage}
 Draft my response:`;
 }
 
+export function buildProactivePrompt(
+  address: string,
+  history: Array<{ direction: string; content: string }>,
+  userMessage: string
+): string {
+  const historyText = history
+    .map(m => `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`)
+    .join("\n\n");
+
+  return `Property: ${address}
+
+Negotiation history so far:
+${historyText || "(No prior messages)"}
+
+User wants to send this proactive message:
+"${userMessage}"
+
+Refine this message into a professional, strategic email that:
+- Maintains the professional tone of the negotiation
+- Is concise and impactful
+- Ends with a clear next step if appropriate
+- Fits naturally into the existing conversation context
+
+Return the refined message as the email body (no subject line needed):`;
+}
+
 // ── Markdown stripping ─────────────────────────────────────────────────────
 
 /**
