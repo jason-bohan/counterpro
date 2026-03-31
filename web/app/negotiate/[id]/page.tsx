@@ -631,25 +631,25 @@ export default function NegotiateThreadPage() {
               {messages.filter(m => m.content !== "[First contact]").map(m => (
                 <div
                   key={m.id}
-                  className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                  className={`flex ${m.direction === "outbound" || m.direction === "proactive" ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`max-w-xl rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                      m.direction === "outbound"
+                      m.direction === "outbound" || m.direction === "proactive"
                         ? "bg-primary text-primary-foreground"
                         : "bg-card border text-foreground"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs opacity-60">
-                        {m.direction === "outbound" ? "You (via AI)" : "Counterparty"}
+                        {m.direction === "outbound" || m.direction === "proactive" ? "You (via AI)" : "Counterparty"}
                         {" · "}
                         {relativeTime(m.created_at)}
                       </span>
-                      {m.direction === "outbound" && m.sent_at && (
+                      {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
                         <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
                       )}
-                      {m.direction === "outbound" && !m.sent_at && m.approved && (
+                      {(m.direction === "outbound" || m.direction === "proactive") && !m.sent_at && m.approved && (
                         <>
                           <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
                           <button
@@ -1053,7 +1053,7 @@ export default function NegotiateThreadPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {messages.filter(m => m.direction === "outbound" && m.approved).length}
+                    {messages.filter(m => (m.direction === "outbound" || m.direction === "proactive") && m.approved).length}
                   </p>
                   <p className="text-xs text-muted-foreground">Sent</p>
                 </div>
