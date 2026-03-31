@@ -131,6 +131,18 @@ export async function sendGmail(
 
   const hasAttachments = attachments && attachments.length > 0;
 
+  console.log("sendGmail: hasAttachments:", hasAttachments);
+  if (hasAttachments) {
+    console.log("sendGmail: attachments count:", attachments!.length);
+    attachments!.forEach((att, i) => {
+      console.log(`sendGmail: attachment ${i}:`, {
+        name: att.name,
+        mimeType: att.mimeType,
+        dataSize: att.data.length
+      });
+    });
+  }
+
   let bodySection: string;
   if (hasAttachments) {
     // multipart/mixed wraps the text body + each attachment

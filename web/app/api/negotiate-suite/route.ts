@@ -79,12 +79,19 @@ export async function PUT(req: NextRequest) {
     discard = form.get("discard") === "true";
     const file = form.get("attachment") as File | null;
     if (file && file.size > 0) {
+      console.log("PUT route: Processing attachment:", file.name, file.type, file.size);
       const bytes = await file.arrayBuffer();
+      console.log("PUT route: Got bytes, length:", bytes.byteLength);
       attachment = {
         name: file.name,
         mimeType: file.type || "application/octet-stream",
         data: Buffer.from(bytes),
       };
+      console.log("PUT route: Created GmailAttachment:", {
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        dataSize: attachment.data.length
+      });
     }
   } else {
     ({ messageId, approved, editedDraft, discard } = await req.json());
