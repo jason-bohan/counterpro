@@ -16,7 +16,11 @@ export async function POST(req: NextRequest) {
   const allowed = await canUserRunSuite(userId);
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
-  const { negotiationId, message } = await req.json();
+  // Handle FormData for file attachments
+  const formData = await req.formData();
+  const negotiationId = formData.get("negotiationId") as string;
+  const message = formData.get("message") as string;
+  const attachment = formData.get("attachment") as File | null;
 
   // Fetch negotiation + message history
   const [neg] = await sql`SELECT * FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}`;
@@ -49,6 +53,23 @@ export async function POST(req: NextRequest) {
     VALUES (${negotiationId}, 'proactive', ${message}, ${draft})
     RETURNING id
   `;
+
+  // Handle attachment if provided
+  if (attachment) {
+    try {
+      // For now, we'll store the attachment info in the message content
+      // In a full implementation, you'd upload to blob storage here
+      const attachmentInfo = `[Attachment: ${attachment.name} (${attachment.size} bytes, ${attachment.type})]`;
+      await sql`
+        UPDATE negotiation_messages 
+        SET content = ${message + '\n\n' + attachmentInfo}
+        WHERE id = ${savedMsg.id}
+      `;
+    } catch (error) {
+      console.error("Failed to process attachment:", error);
+      // Continue without attachment - don't fail the whole request
+    }
+  }
 
   await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
 

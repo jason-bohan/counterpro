@@ -86,6 +86,7 @@ export default function NegotiateThreadPage() {
   const [showProactive, setShowProactive] = useState(false);
   const [proactiveMsg, setProactiveMsg] = useState("");
   const [proactiveDrafting, setProactiveDrafting] = useState(false);
+  const [proactiveAttachment, setProactiveAttachment] = useState<File | null>(null);
 
   // Draft approval
   const [pendingDraft, setPendingDraft] = useState<{ draft: string; messageId: number } | null>(null);
@@ -217,20 +218,30 @@ export default function NegotiateThreadPage() {
   };
 
   const submitProactive = async () => {
-    if (!proactiveMsg.trim()) return;
+    if (!proactiveMsg.trim() || !id) return;
     setProactiveDrafting(true);
     try {
+      const formData = new FormData();
+      formData.append("negotiationId", id.toString());
+      formData.append("message", proactiveMsg);
+      if (proactiveAttachment) {
+        formData.append("attachment", proactiveAttachment);
+      }
+
       const res = await fetch("/api/negotiate-suite/proactive", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ negotiationId: id, message: proactiveMsg }),
+        body: formData,
       });
       if (res.status === 403) { setAccessDenied(true); return; }
       const { draft, messageId } = await res.json();
       setPendingDraft({ draft, messageId });
       setEditedDraft(draft);
       setProactiveMsg("");
+      setProactiveAttachment(null);
       setShowProactive(false);
+      // Clear file input
+      const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
     } finally {
       setProactiveDrafting(false);
       load();
@@ -756,6 +767,54 @@ export default function NegotiateThreadPage() {
                         onChange={e => setProactiveMsg(e.target.value)}
                         autoFocus
                       />
+                      
+                      {/* File attachment */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            id="proactive-file"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) setProactiveAttachment(file);
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('proactive-file')?.click()}
+                            className="text-xs"
+                          >
+                            📎 Attach document
+                          </Button>
+                          {proactiveAttachment && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>📄 {proactiveAttachment.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setProactiveAttachment(null);
+                                  const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+                                  if (fileInput) fileInput.value = '';
+                                }}
+                                className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        {proactiveAttachment && (
+                          <p className="text-xs text-muted-foreground">
+                            Document will be attached to the refined message
+                          </p>
+                        )}
+                      </div>
+                      
                       <div className="flex gap-3">
                         <Button
                           onClick={submitProactive}
@@ -768,7 +827,13 @@ export default function NegotiateThreadPage() {
                             </span>
                           ) : "Refine with AI →"}
                         </Button>
-                        <Button variant="ghost" onClick={() => { setShowProactive(false); setProactiveMsg(""); }}>
+                        <Button variant="ghost" onClick={() => { 
+                          setShowProactive(false); 
+                          setProactiveMsg(""); 
+                          setProactiveAttachment(null);
+                          const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+                          if (fileInput) fileInput.value = '';
+                        }}>
                           Cancel
                         </Button>
                       </div>

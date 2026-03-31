@@ -56,9 +56,18 @@ describe("Proactive Message Integration", () => {
     const lines = prompt.split('\n');
     
     // Verify conversation order is preserved
-    const historySection = lines.join('\n');
-    expect(historySection).toMatch(/Offer \$250k.*Too low, need \$300k.*How about \$275k\?/s);
-    expect(historySection).toContain("I can meet at $285k if we close quickly");
+    expect(prompt).toContain("Offer $250k");
+    expect(prompt).toContain("Too low, need $300k");
+    expect(prompt).toContain("How about $275k?");
+    expect(prompt).toContain("I can meet at $285k if we close quickly");
+    
+    // Verify the order by checking positions
+    const offerIndex = prompt.indexOf("Offer $250k");
+    const tooLowIndex = prompt.indexOf("Too low, need $300k");
+    const howAboutIndex = prompt.indexOf("How about $275k?");
+    
+    expect(offerIndex).toBeLessThan(tooLowIndex);
+    expect(tooLowIndex).toBeLessThan(howAboutIndex);
   });
 
   it("buildProactivePrompt includes all refinement instructions", () => {
