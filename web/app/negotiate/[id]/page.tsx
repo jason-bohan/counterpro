@@ -648,6 +648,9 @@ export default function NegotiateThreadPage() {
                         {" · "}
                         {relativeTime(m.created_at)}
                       </span>
+                      {(m.direction === "outbound" || (m.direction === "proactive" && m.ai_draft && m.ai_draft !== m.content)) && (
+                        <Badge variant="secondary" className="text-xs h-4 shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30">AI</Badge>
+                      )}
                       {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
                         <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
                       )}
