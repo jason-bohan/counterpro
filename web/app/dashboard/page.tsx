@@ -1,9 +1,8 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -80,34 +79,19 @@ function DashboardInner() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="border-b bg-background">
-        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Logo size={44} href="/" />
-          <div className="flex items-center gap-3">
+      <AppHeader
+        nav={[{ label: "Negotiations", href: "/negotiate" }]}
+        right={
+          <>
             {planLabel()}
             {(plan?.plan === "subscription" || plan?.plan === "suite" || plan?.plan === "single") && (
               <Button variant="ghost" size="sm" onClick={openPortal} disabled={portalLoading}>
                 {portalLoading ? "Loading..." : plan?.plan === "single" ? "Billing" : "Manage subscription"}
               </Button>
             )}
-            {user?.firstName ? (
-              <span className="text-sm text-muted-foreground">
-                {user.firstName}
-              </span>
-            ) : user?.username ? (
-              <span className="text-sm text-muted-foreground">
-                {user.username}
-              </span>
-            ) : user?.emailAddresses?.[0] ? (
-              <span className="text-sm text-muted-foreground">
-                {user.emailAddresses[0].emailAddress}
-              </span>
-            ) : null}
-            <UserButton />
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-8 py-10">
         {paymentSuccess && (

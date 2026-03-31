@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 
 type Message = {
   id: number;
@@ -131,6 +131,39 @@ export default function NegotiateThreadPage() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  // Poll for new inbound messages every 20 seconds.
+  // Skips the poll while the user is actively editing a draft to avoid disrupting their work.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!pendingDraft || editedDraft === pendingDraft.draft) {
+        // Silent background refresh — don't touch loading state
+        fetch(`/api/negotiate-suite/threads/${id}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d) return;
+            setMessages(prev => {
+              // Only update if message count changed to avoid disrupting edits
+              if ((d.messages ?? []).length !== prev.length) {
+                // Re-evaluate pending draft from the latest data
+                const pending = (d.messages ?? []).find(
+                  (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
+                );
+                if (pending && !pendingDraft) {
+                  setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
+                  setEditedDraft(pending.ai_draft!);
+                }
+                return d.messages ?? [];
+              }
+              return prev;
+            });
+          })
+          .catch(() => {});
+      }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [id, pendingDraft, editedDraft]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingDraft]);
@@ -334,24 +367,10 @@ export default function NegotiateThreadPage() {
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
-      {/* Header */}
-      <header className="border-b bg-background sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <Logo size={36} href="/" />
-            <Link
-              href="/negotiate"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              ← All negotiations
-            </Link>
-            <span className="text-muted-foreground hidden sm:inline">/</span>
-            <div className="hidden sm:flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm truncate max-w-xs">{negotiation.address}</span>
-              <Badge variant="secondary" className="text-xs capitalize shrink-0">{negotiation.role}</Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
+      <AppHeader
+        nav={[{ label: "← All negotiations", href: "/negotiate" }]}
+        right={
+          <div className="flex items-center gap-2">
             {negotiation.autonomous_mode && (
               <Badge className="text-xs bg-violet-100 text-violet-800 border border-violet-200" variant="outline">
                 Auto-pilot ON
@@ -371,8 +390,8 @@ export default function NegotiateThreadPage() {
               Archive
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 flex-1 w-full">
         {/* Mobile title */}

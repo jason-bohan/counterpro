@@ -55,7 +55,17 @@ export async function refreshGmailToken(userId: string): Promise<string | null> 
     }),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // invalid_grant means the refresh token was revoked or expired (e.g. app in Google "Testing" mode
+    // causes refresh tokens to expire after 7 days). Clear the stale token so the user is prompted
+    // to reconnect rather than silently failing on every send.
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error === "invalid_grant") {
+      console.warn(`[gmail] invalid_grant for user=${userId} — clearing stale token`);
+      await sql`DELETE FROM user_gmail_tokens WHERE clerk_user_id = ${userId}`;
+    }
+    return null;
+  }
 
   const data = await res.json();
   const newAccessToken: string = data.access_token;
@@ -78,7 +88,9 @@ export async function sendGmail(
   body: string,
   from?: string,
   replyTo?: string,
-  html?: string
+  html?: string,
+  threadId?: string,
+  inReplyTo?: string
 ): Promise<boolean> {
   let token = await getGmailToken(userId);
   if (!token) {
@@ -108,6 +120,10 @@ export async function sendGmail(
   if (replyTo) {
     emailLines.push(`Reply-To: ${replyTo}`);
   }
+  if (inReplyTo) {
+    emailLines.push(`In-Reply-To: ${inReplyTo}`);
+    emailLines.push(`References: ${inReplyTo}`);
+  }
   if (html) {
     emailLines.push(
       `Subject: ${encodedSubject}`,
@@ -134,13 +150,16 @@ export async function sendGmail(
   }
   const raw = Buffer.from(emailLines.join("\r\n"), "utf8").toString("base64url");
 
+  const sendPayload: Record<string, string> = { raw };
+  if (threadId) sendPayload.threadId = threadId;
+
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify(sendPayload),
   });
 
   if (!res.ok) {

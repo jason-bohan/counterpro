@@ -1,4 +1,4 @@
-import { sendGmail } from "@/lib/gmail";
+import { Resend } from "resend";
 
 // ── Clerk user lookup ──────────────────────────────────────────────────────
 
@@ -84,13 +84,17 @@ function previewBox(label: string, text: string): string {
 // ── Notification senders ───────────────────────────────────────────────────
 
 async function sendNotification(toEmail: string, subject: string, text: string, html: string): Promise<void> {
-  const gmailUserId = process.env.GMAIL_SYSTEM_USER_ID;
-  if (!gmailUserId) {
-    console.error("[notify] GMAIL_SYSTEM_USER_ID not set");
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[notify] RESEND_API_KEY not set");
     return;
   }
-  const from = process.env.GMAIL_SALES_ADDRESS || "sales@counterproai.com";
-  await sendGmail(gmailUserId, toEmail, subject, text, from, undefined, html);
+  const resend = new Resend(apiKey);
+  const from = process.env.RESEND_FROM_ADDRESS || "CounterPro <notifications@counterproai.com>";
+  const { error } = await resend.emails.send({ from, to: toEmail, subject, text, html });
+  if (error) {
+    console.error("[notify] Resend error:", error);
+  }
 }
 
 export async function sendDraftReadyEmail(

@@ -21,7 +21,7 @@ async function getSystemAccessToken(): Promise<string | null> {
   return getAccessToken(systemUserId);
 }
 
-async function processNewMessages(historyId: string): Promise<void> {
+export async function processNewMessages(historyId: string): Promise<void> {
   await setupDatabase();
 
   // Atomically advance the stored historyId only if the incoming one is newer.
@@ -101,6 +101,11 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   const msgData = await msgRes.json();
   const email = parseEmail(msgData.payload ?? {});
   const { to: toHeader, from: fromHeader, subject: subjectHeader, body } = email;
+  const gmailThreadId: string | null = msgData.threadId ?? null;
+  const gmailMessageId: string | null =
+    (msgData.payload?.headers ?? []).find(
+      (h: { name: string; value: string }) => h.name.toLowerCase() === "message-id"
+    )?.value ?? null;
 
   const routing = routeInboundEmail(fromHeader, toHeader);
 
@@ -149,8 +154,8 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
 
   // Save inbound message + draft
   const [savedMsg] = await sql`
-    INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft)
-    VALUES (${negotiationId}, 'inbound', ${body}, ${draft})
+    INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft, gmail_thread_id, gmail_message_id)
+    VALUES (${negotiationId}, 'inbound', ${body}, ${draft}, ${gmailThreadId}, ${gmailMessageId})
     RETURNING id
   `;
 
@@ -169,7 +174,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
       const subject = `Re: Negotiation - ${neg.address}`;
       const fromAddress = neg.alias_email || process.env.GMAIL_SALES_ADDRESS;
       const replyTo = neg.alias_email ?? undefined;
-      const sent = await sendGmail(sendAsUserId, neg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo);
+      const sent = await sendGmail(sendAsUserId, neg.counterparty_email, subject, plainText, fromAddress ?? undefined, replyTo, undefined, gmailThreadId ?? undefined, gmailMessageId ?? undefined);
 
       if (sent) {
         // Mark inbound as approved, save outbound

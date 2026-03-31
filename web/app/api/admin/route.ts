@@ -175,5 +175,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "delete_gmail_token") {
+    const { clerk_user_id } = data;
+    if (!clerk_user_id) return NextResponse.json({ error: "clerk_user_id required" }, { status: 400 });
+    await sql`DELETE FROM user_gmail_tokens WHERE clerk_user_id = ${clerk_user_id}`;
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

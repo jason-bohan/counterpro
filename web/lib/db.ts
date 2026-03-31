@@ -107,6 +107,9 @@ export async function setupDatabase() {
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
   await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`;
 
+  await sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT`;
+  await sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_message_id TEXT`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS webhook_logs (
       id SERIAL PRIMARY KEY,
