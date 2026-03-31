@@ -253,9 +253,11 @@ export default function NegotiateThreadPage() {
     if (!proactiveMsg.trim() || !id) return;
     setProactiveDrafting(true);
     try {
+      // For Quick Send, skip AI and use the user's message directly
       const formData = new FormData();
       formData.append("negotiationId", id.toString());
       formData.append("message", proactiveMsg);
+      formData.append("skipAI", "true"); // Flag to skip AI refinement
       if (proactiveAttachment) {
         formData.append("attachment", proactiveAttachment);
       }
@@ -265,7 +267,7 @@ export default function NegotiateThreadPage() {
         body: formData,
       });
       if (res.status === 403) { setAccessDenied(true); return; }
-      const { draft, messageId } = await res.json();
+      const { messageId } = await res.json();
       
       // Auto-approve and send without review
       let sendBody: BodyInit;
@@ -274,14 +276,14 @@ export default function NegotiateThreadPage() {
         const sendForm = new FormData();
         sendForm.append("messageId", String(messageId));
         sendForm.append("approved", "true");
-        sendForm.append("editedDraft", draft);
+        sendForm.append("editedDraft", proactiveMsg); // Use original message
         sendForm.append("attachment", proactiveAttachment);
         sendBody = sendForm;
       } else {
         sendBody = JSON.stringify({ 
           messageId, 
           approved: "true", 
-          editedDraft: draft 
+          editedDraft: proactiveMsg // Use original message
         });
         sendHeaders = { "Content-Type": "application/json" };
       }
@@ -642,7 +644,7 @@ export default function NegotiateThreadPage() {
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs opacity-60">
-                        {m.direction === "outbound" || m.direction === "proactive" ? "You (via AI)" : "Counterparty"}
+                        {m.direction === "proactive" || m.direction === "outbound" ? "You" : "Counterparty"}
                         {" · "}
                         {relativeTime(m.created_at)}
                       </span>

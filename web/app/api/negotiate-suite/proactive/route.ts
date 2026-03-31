@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
     const negotiationId = formData.get("negotiationId") as string;
     const message = formData.get("message") as string;
     const attachment = formData.get("attachment") as File | null;
+    const skipAI = formData.get("skipAI") as string;
 
-    console.log("Proactive API: Parsed data:", { negotiationId, message: message?.substring(0, 100), hasAttachment: !!attachment });
+    console.log("Proactive API: Parsed data:", { negotiationId, message: message?.substring(0, 100), hasAttachment: !!attachment, skipAI });
 
     if (!negotiationId || !message) {
       console.log("Proactive API: Missing required fields");
@@ -48,29 +49,37 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("Proactive API: Found negotiation:", neg.id);
-    const messages = await sql`
-      SELECT direction, content FROM negotiation_messages
-      WHERE negotiation_id = ${negotiationId}
-      ORDER BY created_at ASC
-    `;
+  
+    let draft = message; // Default: use original message
+  
+    // Only call AI if not skipping
+    if (skipAI !== "true") {
+      console.log("Proactive API: Calling Claude API for refinement");
+      const messages = await sql`
+        SELECT direction, content FROM negotiation_messages
+        WHERE negotiation_id = ${negotiationId}
+        ORDER BY created_at ASC
+      `;
 
-    console.log("Proactive API: Found messages:", messages.length);
-    const prompt = buildProactivePrompt(
-      neg.address,
-      messages as Array<{ direction: string; content: string }>,
-      message
-    );
+      console.log("Proactive API: Found messages:", messages.length);
+      const prompt = buildProactivePrompt(
+        neg.address,
+        messages as Array<{ direction: string; content: string }>,
+        message
+      );
 
-    console.log("Proactive API: Calling Claude API");
-    const claudeMessage = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: SUITE_MAX_TOKENS,
-      system: SUITE_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: prompt }],
-    });
+      const claudeMessage = await client.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: SUITE_MAX_TOKENS,
+        system: SUITE_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: prompt }],
+      });
 
-    const draft = claudeMessage.content[0].type === "text" ? claudeMessage.content[0].text : "";
-    console.log("Proactive API: Claude response received, draft length:", draft.length);
+      draft = claudeMessage.content[0].type === "text" ? claudeMessage.content[0].text : "";
+      console.log("Proactive API: Claude response received, draft length:", draft.length);
+    } else {
+      console.log("Proactive API: Skipping AI refinement, using original message");
+    }
 
     // Save proactive message + draft as proactive (its own category)
     const [savedMsg] = await sql`
@@ -103,7 +112,12 @@ export async function POST(req: NextRequest) {
     await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
 
     console.log("Proactive API: Request completed successfully");
-    return NextResponse.json({ draft, messageId: savedMsg.id });
+    // Return different response based on whether AI was used
+    if (skipAI === "true") {
+      return NextResponse.json({ messageId: savedMsg.id });
+    } else {
+      return NextResponse.json({ draft, messageId: savedMsg.id });
+    }
   } catch (error) {
     console.error("Proactive API: Error occurred:", error);
     return NextResponse.json({ 
