@@ -31,6 +31,7 @@ type Thread = {
 const SUITE_TOUR_STORAGE_KEY = "counterpro:tour:suite:v1";
 const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
 const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
+const SUITE_CHECKLIST_HIDDEN_KEY = "counterpro:onboarding:checklist-hidden";
 
 function relativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -66,6 +67,7 @@ export default function NegotiateSuitePage() {
   const [tourReady, setTourReady] = useState(false);
   const [hasVisitedThread, setHasVisitedThread] = useState(false);
   const [hasCopiedAlias, setHasCopiedAlias] = useState(false);
+  const [checklistHidden, setChecklistHidden] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,6 +89,7 @@ export default function NegotiateSuitePage() {
     if (typeof window === "undefined") return;
     setHasVisitedThread(window.localStorage.getItem(SUITE_THREAD_VISITED_KEY) === "true");
     setHasCopiedAlias(window.localStorage.getItem(SUITE_ALIAS_COPIED_KEY) === "true");
+    setChecklistHidden(window.localStorage.getItem(SUITE_CHECKLIST_HIDDEN_KEY) === "true");
   }, []);
 
   useEffect(() => {
@@ -296,6 +299,19 @@ export default function NegotiateSuitePage() {
     },
   ];
   const completedChecklistCount = checklistItems.filter(item => item.complete).length;
+  const hideChecklist = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SUITE_CHECKLIST_HIDDEN_KEY, "true");
+    }
+    setChecklistHidden(true);
+  };
+
+  const showChecklist = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SUITE_CHECKLIST_HIDDEN_KEY);
+    }
+    setChecklistHidden(false);
+  };
 
   if (accessDenied) {
     return (
@@ -336,23 +352,37 @@ export default function NegotiateSuitePage() {
           </div>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h1 className="text-3xl font-bold mb-2">Full Negotiation Suite</h1>
-            {tourReady && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-3 text-xs"
-                onClick={() => startSuiteTour(false)}
-              >
-                Take suite tour
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {checklistHidden && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  onClick={showChecklist}
+                >
+                  Show setup steps
+                </Button>
+              )}
+              {tourReady && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => startSuiteTour(false)}
+                >
+                  Take suite tour
+                </Button>
+              )}
+            </div>
           </div>
           <p className="text-muted-foreground max-w-xl">
             AI manages your negotiation. You approve every response.
           </p>
         </div>
 
+        {!checklistHidden && (
         <Card className="mb-8 border-primary/20 bg-background/80">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -362,9 +392,20 @@ export default function NegotiateSuitePage() {
                   Complete the core steps once, then the suite starts feeling automatic.
                 </p>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {completedChecklistCount}/{checklistItems.length} complete
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  {completedChecklistCount}/{checklistItems.length} complete
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                  onClick={hideChecklist}
+                >
+                  Hide
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -408,6 +449,7 @@ export default function NegotiateSuitePage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Start new negotiation */}
         <div className="mb-8" data-tour="start-negotiation">
