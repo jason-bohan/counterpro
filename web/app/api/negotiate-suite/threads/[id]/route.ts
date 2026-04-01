@@ -44,7 +44,41 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY created_at DESC
   `;
 
-  return NextResponse.json({ negotiation: neg, messages, deadlines, documents });
+  const isCounterProAlias =
+    typeof neg.counterparty_email === "string" &&
+    /^sales\+neg\d+@counterproai\.com$/i.test(neg.counterparty_email);
+
+  let pairedCounterpartyConfirmed = false;
+  let pairedCounterpartyAddress: string | null = null;
+  let pairedCounterpartyRole: string | null = null;
+
+  if (isCounterProAlias && neg.alias_email) {
+    const [pairedCounterparty] = await sql`
+      SELECT alias_email, counterparty_email, address, role
+      FROM negotiations
+      WHERE alias_email = ${neg.counterparty_email.toLowerCase()}
+      LIMIT 1
+    `;
+
+    if (pairedCounterparty) {
+      pairedCounterpartyAddress = pairedCounterparty.address ?? null;
+      pairedCounterpartyRole = pairedCounterparty.role ?? null;
+      pairedCounterpartyConfirmed =
+        String(pairedCounterparty.counterparty_email ?? "").toLowerCase() === String(neg.alias_email).toLowerCase();
+    }
+  }
+
+  return NextResponse.json({
+    negotiation: {
+      ...neg,
+      paired_counterparty_confirmed: pairedCounterpartyConfirmed,
+      paired_counterparty_address: pairedCounterpartyAddress,
+      paired_counterparty_role: pairedCounterpartyRole,
+    },
+    messages,
+    deadlines,
+    documents,
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -66,6 +100,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const body = await req.json();
   const { status, counterparty_email, deadline_date, autonomous_mode, archived } = body;
+  const normalizedCounterpartyEmail =
+    counterparty_email !== undefined
+      ? (typeof counterparty_email === "string" && counterparty_email.trim() !== ""
+          ? counterparty_email.trim().toLowerCase()
+          : null)
+      : undefined;
 
   const validStatuses = ["active", "pending", "closed", "won", "lost"];
   if (status !== undefined && !validStatuses.includes(status)) {
@@ -89,7 +129,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     UPDATE negotiations
     SET
       status = COALESCE(${status ?? null}, status),
-      counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
+      counterparty_email = COALESCE(${normalizedCounterpartyEmail ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
       ${archived !== undefined ? sql`archived_at = ${archived === true ? sql`NOW()` : null}` : sql`archived_at = archived_at`},

@@ -191,12 +191,12 @@ describe("parseEmail", () => {
 describe("routeInboundEmail", () => {
   it("routes to correct negotiation ID", () => {
     const result = routeInboundEmail("buyer@gmail.com", "sales+neg42@counterproai.com");
-    expect(result).toEqual({ type: "negotiation", negotiationId: 42 });
+    expect(result).toEqual({ type: "negotiation", negotiationId: 42, sourceNegotiationId: null });
   });
 
   it("is case-insensitive on the alias", () => {
     const result = routeInboundEmail("x@x.com", "Sales+Neg7@COUNTERPROAI.COM");
-    expect(result).toEqual({ type: "negotiation", negotiationId: 7 });
+    expect(result).toEqual({ type: "negotiation", negotiationId: 7, sourceNegotiationId: null });
   });
 
   it("detects loop (email from our own domain)", () => {
@@ -204,8 +204,13 @@ describe("routeInboundEmail", () => {
     expect(result).toEqual({ type: "loop" });
   });
 
-  it("detects loop for alias-to-alias", () => {
+  it("captures source negotiation for alias-to-alias mail", () => {
     const result = routeInboundEmail("sales+neg2@counterproai.com", "sales+neg1@counterproai.com");
+    expect(result).toEqual({ type: "negotiation", negotiationId: 1, sourceNegotiationId: 2 });
+  });
+
+  it("detects loop when an alias emails itself", () => {
+    const result = routeInboundEmail("sales+neg2@counterproai.com", "sales+neg2@counterproai.com");
     expect(result).toEqual({ type: "loop" });
   });
 
@@ -224,7 +229,7 @@ describe("routeInboundEmail", () => {
       "buyer@gmail.com",
       "CounterPro <sales+neg12@counterproai.com>"
     );
-    expect(result).toEqual({ type: "negotiation", negotiationId: 12 });
+    expect(result).toEqual({ type: "negotiation", negotiationId: 12, sourceNegotiationId: null });
   });
 });
 

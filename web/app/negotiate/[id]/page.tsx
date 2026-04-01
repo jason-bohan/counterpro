@@ -50,7 +50,16 @@ type Negotiation = {
   created_at: string;
   autonomous_mode: boolean;
   gmail_token?: string | null;
+  paired_counterparty_confirmed?: boolean;
+  paired_counterparty_address?: string | null;
+  paired_counterparty_role?: string | null;
 };
+
+const COUNTERPRO_ALIAS_PATTERN = /^sales\+neg\d+@counterproai\.com$/i;
+
+function isCounterProAliasEmail(value: string | null | undefined): boolean {
+  return typeof value === "string" && COUNTERPRO_ALIAS_PATTERN.test(value.trim());
+}
 
 function getQuoteDepth(line: string): number {
   const match = line.match(/^\s*((?:>\s*)+)/);
@@ -156,6 +165,9 @@ export default function NegotiateThreadPage() {
   const [emailValue, setEmailValue] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
   const [aliasCopied, setAliasCopied] = useState(false);
+  const [editingPairing, setEditingPairing] = useState(false);
+  const [pairingAliasValue, setPairingAliasValue] = useState("");
+  const [savingPairing, setSavingPairing] = useState(false);
 
   // Resend
   const [resending, setResending] = useState<number | null>(null);
@@ -202,7 +214,9 @@ export default function NegotiateThreadPage() {
         setMessages(d.messages ?? []);
         setDeadlines(d.deadlines ?? []);
         setDocuments(d.documents ?? []);
-        setEmailValue(d.negotiation?.counterparty_email ?? "");
+        const nextCounterpartyEmail = d.negotiation?.counterparty_email ?? "";
+        setEmailValue(isCounterProAliasEmail(nextCounterpartyEmail) ? "" : nextCounterpartyEmail);
+        setPairingAliasValue(isCounterProAliasEmail(nextCounterpartyEmail) ? nextCounterpartyEmail : "");
         // Sync pending draft from DB
         const pending = (d.messages ?? []).find(
           (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
@@ -425,10 +439,33 @@ export default function NegotiateThreadPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ counterparty_email: emailValue }),
       });
-      if (negotiation) setNegotiation({ ...negotiation, counterparty_email: emailValue || null });
+      if (negotiation) {
+        setNegotiation({
+          ...negotiation,
+          counterparty_email: emailValue || null,
+          paired_counterparty_confirmed: false,
+          paired_counterparty_address: null,
+          paired_counterparty_role: null,
+        });
+      }
       setEditingEmail(false);
     } finally {
       setSavingEmail(false);
+    }
+  };
+
+  const savePairing = async () => {
+    setSavingPairing(true);
+    try {
+      await fetch(`/api/negotiate-suite/threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ counterparty_email: pairingAliasValue }),
+      });
+      setEditingPairing(false);
+      load();
+    } finally {
+      setSavingPairing(false);
     }
   };
 
@@ -521,6 +558,7 @@ export default function NegotiateThreadPage() {
     : 0;
 
   const hasEmail = !!(negotiation?.counterparty_email || emailValue);
+  const isPairedCounterparty = isCounterProAliasEmail(negotiation?.counterparty_email);
 
   if (accessDenied) {
     return (
@@ -1163,7 +1201,7 @@ export default function NegotiateThreadPage() {
                   </div>
                 )}
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Counterparty email</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">External counterparty email</p>
                   {editingEmail ? (
                     <div className="flex gap-2">
                       <Input
@@ -1194,7 +1232,7 @@ export default function NegotiateThreadPage() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className={negotiation.counterparty_email ? "text-foreground" : "text-muted-foreground"}>
-                        {negotiation.counterparty_email || "Not set"}
+                        {emailValue || "Not set"}
                       </span>
                       <button
                         onClick={() => setEditingEmail(true)}
@@ -1202,6 +1240,76 @@ export default function NegotiateThreadPage() {
                       >
                         Edit
                       </button>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-muted-foreground mb-0.5">CounterPro pairing</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Link this negotiation to another CounterPro thread using its alias email.
+                  </p>
+                  {editingPairing ? (
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        value={pairingAliasValue}
+                        onChange={e => setPairingAliasValue(e.target.value)}
+                        className="h-8 text-xs"
+                        placeholder="sales+neg123@counterproai.com"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={savePairing}
+                          disabled={savingPairing || !pairingAliasValue.trim()}
+                        >
+                          {savingPairing ? "..." : "Save"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs px-2"
+                          onClick={() => {
+                            setEditingPairing(false);
+                            setPairingAliasValue(isPairedCounterparty ? negotiation.counterparty_email ?? "" : "");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={isPairedCounterparty ? "text-foreground font-mono text-xs break-all" : "text-muted-foreground"}>
+                          {isPairedCounterparty ? negotiation.counterparty_email : "Not paired"}
+                        </span>
+                        <button
+                          onClick={() => setEditingPairing(true)}
+                          className="text-xs text-primary hover:underline shrink-0"
+                        >
+                          {isPairedCounterparty ? "Change" : "Pair"}
+                        </button>
+                      </div>
+                      {isPairedCounterparty && (
+                        <>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${negotiation.paired_counterparty_confirmed ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}
+                          >
+                            {negotiation.paired_counterparty_confirmed ? "Reciprocal pairing confirmed" : "Waiting for reciprocal pairing"}
+                          </Badge>
+                          {negotiation.paired_counterparty_address && (
+                            <p className="text-xs text-muted-foreground">
+                              Linked to {negotiation.paired_counterparty_role ?? "counterparty"} thread:
+                              {" "}
+                              {negotiation.paired_counterparty_address}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
