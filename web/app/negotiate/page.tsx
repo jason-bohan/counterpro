@@ -373,7 +373,7 @@ export default function NegotiateSuitePage() {
         {/* Hero */}
         <div className="mb-10" data-tour="suite-hero">
           <div className="flex items-center gap-2 mb-3">
-            <Badge variant="outline" className="text-xs">Full Negotiation Suite</Badge>
+            <Badge className="text-xs bg-purple-600 text-white border-0">Full Negotiation Suite</Badge>
           </div>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h1 className="text-3xl font-bold mb-2">Full Negotiation Suite</h1>
