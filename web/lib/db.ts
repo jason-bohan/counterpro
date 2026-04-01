@@ -163,6 +163,13 @@ export async function setupDatabase() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // Backfill alias_email for negotiations created before this column existed
+  await m("backfill_alias_email", sql`
+    UPDATE negotiations
+    SET alias_email = 'sales+neg' || id::text || '@counterproai.com'
+    WHERE alias_email IS NULL
+  `);
 }
 
 export async function getUserPlan(clerkUserId: string) {
