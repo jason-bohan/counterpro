@@ -9,28 +9,25 @@ export function SupportEmail({ className }: { className?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Try mailto: first. If the browser can't handle it (no mail client),
-    // it fires a visibilitychange within ~500ms as focus never leaves the tab.
-    // In that case we fall back to Gmail compose and copy the address.
+    // Try mailto first; if no mail client opens, the user stays on-tab and we
+    // fall back to Gmail compose while copying the address for convenience.
     navigator.clipboard.writeText(EMAIL).catch(() => {});
 
     const startTime = Date.now();
     const onVisibility = () => {
       document.removeEventListener("visibilitychange", onVisibility);
-      if (document.hidden) return; // tab actually left — mail client opened
-      // Tab stayed visible → no mail client; open Gmail compose
+      if (document.hidden) return;
       if (Date.now() - startTime < 600) {
         window.open(GMAIL_COMPOSE, "_blank");
       }
     };
+
     document.addEventListener("visibilitychange", onVisibility);
-    // Clean up listener if the user never triggers it
     setTimeout(() => document.removeEventListener("visibilitychange", onVisibility), 1500);
 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
-    // Let the default mailto: attempt proceed
     void e;
   };
 
@@ -39,7 +36,7 @@ export function SupportEmail({ className }: { className?: string }) {
       href={`mailto:${EMAIL}`}
       className={className}
       onClick={handleClick}
-      title={copied ? "Copied!" : "Opens mail app — or Gmail if none configured"}
+      title={copied ? "Copied!" : "Opens mail app or Gmail if none configured"}
     >
       {copied ? "Copied!" : EMAIL}
     </a>

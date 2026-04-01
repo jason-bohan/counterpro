@@ -215,7 +215,7 @@ function DashboardInner() {
                 <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Email &amp; verbal scripts</span></li>
                 <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Walk-away point analysis</span></li>
               </ul>
-              <div className="mt-auto space-y-3 pt-1">
+              <div className="mt-auto space-y-3">
                 <Link href="/pricing">
                   <Button className="w-full" variant="outline">Get package</Button>
                 </Link>
