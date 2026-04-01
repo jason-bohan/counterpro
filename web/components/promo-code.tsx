@@ -45,9 +45,9 @@ export function PromoCode({ onRedeemed }: { onRedeemed?: () => void }) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-lg border border-border bg-muted/30 p-2.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/25">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-muted/30 p-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/25">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Input
           placeholder="Enter code"
           value={code}
@@ -62,7 +62,7 @@ export function PromoCode({ onRedeemed }: { onRedeemed?: () => void }) {
           variant="ghost"
           size="icon"
           onClick={() => setOpen(false)}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 self-end sm:self-auto text-muted-foreground hover:text-foreground"
           aria-label="Close promo code form"
         >
           ✕
