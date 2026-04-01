@@ -146,17 +146,26 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  await sql`
-    UPDATE negotiation_messages
-    SET approved = true, ai_draft = ${finalText}, sent_at = ${sent ? sql`NOW()` : null}
-    WHERE id = ${messageId}
-  `;
+  if (msg.direction === "proactive") {
+    // Proactive messages are already outbound — update in-place so only one bubble appears
+    await sql`
+      UPDATE negotiation_messages
+      SET direction = 'outbound', content = ${plainText}, approved = true, ai_draft = ${finalText}, sent_at = ${sent ? sql`NOW()` : null}
+      WHERE id = ${messageId}
+    `;
+  } else {
+    await sql`
+      UPDATE negotiation_messages
+      SET approved = true, ai_draft = ${finalText}, sent_at = ${sent ? sql`NOW()` : null}
+      WHERE id = ${messageId}
+    `;
 
-  // Save outbound message
-  await sql`
-    INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at)
-    VALUES (${msg.negotiation_id}, 'outbound', ${plainText}, true, ${sent ? sql`NOW()` : null})
-  `;
+    // Save outbound reply as a separate record
+    await sql`
+      INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at)
+      VALUES (${msg.negotiation_id}, 'outbound', ${plainText}, true, ${sent ? sql`NOW()` : null})
+    `;
+  }
 
   // Save attachment to Blob and record it so users can access sent documents later
   if (sent && attachment) {

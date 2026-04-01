@@ -90,11 +90,8 @@ export async function POST(req: NextRequest) {
 
     console.log("Proactive API: Message saved:", savedMsg.id);
 
-    // Note: We don't handle attachment here - let the PUT route handle it properly
-    // The attachment will be processed when the message is approved/sent via PUT
-    if (attachment) {
-      console.log("Proactive API: Attachment detected, will be processed by PUT route:", attachment.name);
-    }
+    // Attachment is passed through to the PUT /api/negotiate-suite handler for Gmail send +
+    // Blob upload — nothing to do here.
 
     await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
 

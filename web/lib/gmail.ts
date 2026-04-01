@@ -131,49 +131,35 @@ export async function sendGmail(
 
   const hasAttachments = attachments && attachments.length > 0;
 
-  console.log("sendGmail: hasAttachments:", hasAttachments);
-  if (hasAttachments) {
-    console.log("sendGmail: attachments count:", attachments!.length);
-    attachments!.forEach((att, i) => {
-      console.log(`sendGmail: attachment ${i}:`, {
-        name: att.name,
-        mimeType: att.mimeType,
-        dataSize: att.data.length
-      });
-    });
-  }
-
+  // Content-Type must live in the headers section (before the blank-line separator),
+  // not in the body — email clients won't parse attachments otherwise.
   let bodySection: string;
   if (hasAttachments) {
-    // multipart/mixed wraps the text body + each attachment
     const boundary = "boundary_mixed_cp";
+    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+
     const textPart = [
       `--${boundary}`,
       `Content-Type: text/plain; charset=utf-8`,
+      `Content-Transfer-Encoding: 7bit`,
       ``,
       body,
     ].join("\r\n");
+
     const attachParts = attachments!.map(att => [
       `--${boundary}`,
       `Content-Type: ${att.mimeType}; name="${att.name}"`,
       `Content-Transfer-Encoding: base64`,
       `Content-Disposition: attachment; filename="${att.name}"`,
       ``,
-      att.data.toString("base64").match(/.{1,76}/g)?.join("\r\n") || att.data.toString("base64"),
+      att.data.toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? att.data.toString("base64"),
     ].join("\r\n")).join("\r\n");
 
-    bodySection = [
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      ``,
-      textPart,
-      attachParts,
-      `--${boundary}--`,
-    ].join("\r\n");
+    bodySection = [textPart, attachParts, `--${boundary}--`].join("\r\n");
   } else if (html) {
     const boundary = "boundary_alt_cp";
+    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
     bodySection = [
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      ``,
       `--${boundary}`,
       `Content-Type: text/plain; charset=utf-8`,
       ``,
@@ -185,7 +171,8 @@ export async function sendGmail(
       `--${boundary}--`,
     ].join("\r\n");
   } else {
-    bodySection = [`Content-Type: text/plain; charset=utf-8`, ``, body].join("\r\n");
+    headers.push(`Content-Type: text/plain; charset=utf-8`);
+    bodySection = body;
   }
 
   const raw = Buffer.from([...headers, "", bodySection].join("\r\n"), "utf8").toString("base64url");
