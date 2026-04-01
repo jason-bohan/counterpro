@@ -4,15 +4,16 @@ import { sql, setupDatabase } from "@/lib/db";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await setupDatabase();
 
-  const id = Number(params.id);
-  if (isNaN(id)) {
+  const { id } = await params;
+  const idNum = Number(id);
+  if (isNaN(idNum)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
@@ -20,7 +21,7 @@ export async function GET(
   const [negotiation] = await sql`
     SELECT id, address, role, status, counterparty_email, created_at, archived_at
     FROM negotiations
-    WHERE id = ${id} 
+    WHERE id = ${idNum} 
     AND clerk_user_id = ${userId}
     AND archived_at IS NOT NULL
   `;

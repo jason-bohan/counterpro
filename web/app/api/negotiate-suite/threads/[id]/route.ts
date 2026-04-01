@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
-      archived_at = ${archived === true ? sql`NOW()` : archived === false ? null : sql`archived_at`},
+      ${archived !== undefined ? sql`archived_at = ${archived === true ? sql`NOW()` : null}` : sql`archived_at = archived_at`},
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
     RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, updated_at
