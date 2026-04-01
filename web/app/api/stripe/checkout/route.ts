@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { plan } = await req.json();
+  const { plan, embedded } = await req.json();
   const validPlans = ["subscription", "single", "suite"];
   if (!validPlans.includes(plan)) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
@@ -38,12 +38,27 @@ export async function POST(req: NextRequest) {
           return email ? { customer_email: email } : {};
         })();
 
-    const session = await stripe.checkout.sessions.create({
-      mode: plan === "subscription" || plan === "suite" ? "subscription" : "payment",
-      payment_method_types: ["card"],
+    const isSubscription = plan === "subscription" || plan === "suite";
+    const baseParams = {
+      mode: isSubscription ? "subscription" as const : "payment" as const,
+      payment_method_types: ["card"] as ["card"],
       ...customerParam,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { clerk_user_id: userId, plan },
+    };
+
+    if (embedded) {
+      const session = await stripe.checkout.sessions.create({
+        ...baseParams,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ui_mode: "embedded" as any,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
+      });
+      return NextResponse.json({ clientSecret: session.client_secret });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      ...baseParams,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
     });

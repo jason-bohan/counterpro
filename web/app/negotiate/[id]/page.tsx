@@ -144,7 +144,7 @@ function onboardingStorageKey(base: string, userId: string | null | undefined): 
 function getLatestPendingInboundDraft(messages: Message[]): Message | null {
   return [...messages]
     .reverse()
-    .find((m) => m.direction === "inbound" && Boolean(m.ai_draft) && !m.approved) ?? null;
+    .find((m) => Boolean(m.ai_draft) && !m.approved && (m.direction === "inbound" || m.direction === "proactive")) ?? null;
 }
 
 function getMessageProvenanceBadge(message: Message): { label: string; className: string } | null {

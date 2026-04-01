@@ -8,29 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
 import { SupportEmail } from "@/components/support-email";
+import { CheckoutSheet } from "@/components/checkout-sheet";
+
+type Plan = "single" | "subscription" | "suite";
 
 export default function PricingPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState<string | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
 
-  const checkout = async (plan: "single" | "subscription" | "suite") => {
-    setLoading(plan);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
-      });
-      if (res.status === 401) { router.push("/sign-in?redirect_url=/pricing"); return; }
-      const { url } = await res.json();
-      if (url) window.location.href = url;
-    } finally {
-      setLoading(null);
-    }
-  };
+
+  const checkout = (plan: Plan) => setCheckoutPlan(plan);
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
+      <CheckoutSheet
+        plan={checkoutPlan}
+        onClose={() => setCheckoutPlan(null)}
+        onUnauth={() => { setCheckoutPlan(null); router.push("/sign-in?redirect_url=/pricing"); }}
+      />
       <header className="border-b bg-background">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center">
           <Logo size={44} href="/" />
@@ -63,10 +58,9 @@ export default function PricingPage() {
                 className="w-full"
                 variant="outline"
                 size="lg"
-                disabled={loading === "single"}
                 onClick={() => checkout("single")}
               >
-                {loading === "single" ? "Redirecting..." : "Get started — $50"}
+                Get started — $50
               </Button>
             </CardContent>
           </Card>
@@ -92,10 +86,9 @@ export default function PricingPage() {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={loading === "subscription"}
                 onClick={() => checkout("subscription")}
               >
-                {loading === "subscription" ? "Redirecting..." : "Subscribe — $100/mo"}
+                Subscribe — $100/mo
               </Button>
             </CardContent>
           </Card>
@@ -136,8 +129,8 @@ export default function PricingPage() {
                   AI manages the full back-and-forth. You approve each response before it sends from your own email. Includes thread tracking, deadline alerts, and contingency management.
                 </p>
               </div>
-              <Button onClick={() => checkout("suite")} disabled={loading === "suite"} className="shrink-0">
-                {loading === "suite" ? "Redirecting..." : "Subscribe →"}
+              <Button onClick={() => checkout("suite")} className="shrink-0">
+                Subscribe →
               </Button>
             </CardContent>
           </Card>
