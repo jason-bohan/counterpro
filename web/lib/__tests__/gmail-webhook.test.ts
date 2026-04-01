@@ -17,12 +17,16 @@ const {
   historyState,
   mockSendGmail,
   fetchOverride,
+  negotiationState,
 } = vi.hoisted(() => ({
   savedMessages: [] as Array<Record<string, unknown>>,
   sqlState: { history_id: "100" },
   historyState: { messageIds: [] as string[] },
   mockSendGmail: vi.fn().mockResolvedValue(true),
   fetchOverride: { handler: null as ((url: string) => Response | null) | null },
+  negotiationState: {
+    neg42CounterpartyEmail: "buyer@example.com",
+  },
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -44,8 +48,16 @@ vi.mock("@/lib/db", () => ({
     }
     if (q.includes("SELECT * FROM negotiations WHERE id")) {
       const negId = values[0];
-      if (negId === 42) return [{ id: 42, clerk_user_id: "user_owner", address: "123 Oak Street", counterparty_email: "buyer@example.com", alias_email: "sales+neg42@counterproai.com", autonomous_mode: false }];
+      if (negId === 42) return [{ id: 42, clerk_user_id: "user_owner", address: "123 Oak Street", counterparty_email: negotiationState.neg42CounterpartyEmail, alias_email: "sales+neg42@counterproai.com", autonomous_mode: false }];
       if (negId === 99) return [{ id: 99, clerk_user_id: "user_owner", address: "456 Elm Ave", counterparty_email: "seller@example.com", alias_email: "sales+neg99@counterproai.com", autonomous_mode: true }];
+      if (negId === 55) return [{ id: 55, clerk_user_id: "seller_user", address: "123 Oak Street", counterparty_email: "sales+neg42@counterproai.com", alias_email: "sales+neg55@counterproai.com", autonomous_mode: false }];
+      if (negId === 77) return [{ id: 77, clerk_user_id: "other_user", address: "123 Oak Street", counterparty_email: "outsider@example.com", alias_email: "sales+neg77@counterproai.com", autonomous_mode: false }];
+      return [];
+    }
+    if (q.includes("SELECT id, alias_email, counterparty_email FROM negotiations")) {
+      const negId = values[0];
+      if (negId === 55) return [{ id: 55, alias_email: "sales+neg55@counterproai.com", counterparty_email: "sales+neg42@counterproai.com" }];
+      if (negId === 77) return [{ id: 77, alias_email: "sales+neg77@counterproai.com", counterparty_email: "outsider@example.com" }];
       return [];
     }
     if (q.includes("SELECT direction, content FROM negotiation_messages")) {
@@ -89,6 +101,7 @@ beforeEach(() => {
   mockSendGmail.mockClear();
   sqlState.history_id = "100";
   fetchOverride.handler = null;
+  negotiationState.neg42CounterpartyEmail = "buyer@example.com";
 
   process.env.GMAIL_SYSTEM_USER_ID = "system_user_123";
   process.env.GMAIL_WEBHOOK_SECRET = "";
@@ -253,13 +266,50 @@ describe("Gmail webhook — inbound message processing", () => {
     expect(savedMessages.find(m => m.direction === "outbound")).toBeDefined();
   });
 
-  it("rejects loop emails (from counterproai.com domain)", async () => {
+  it("rejects non-alias internal emails from counterproai.com", async () => {
     historyState.messageIds = ["msg-loop"];
     fetchOverride.handler = (url) =>
       url.includes("/messages/msg-loop")
         ? new Response(JSON.stringify(buildFakeGmailMessage("msg-loop", {
             from: "noreply@counterproai.com",
             to: "sales+neg42@counterproai.com",
+          })), { status: 200 })
+        : null;
+
+    const { processNewMessages } = await import("@/app/api/webhooks/gmail/route");
+    await processNewMessages("200");
+
+    expect(savedMessages).toHaveLength(0);
+  });
+
+  it("accepts alias-to-alias mail when both negotiations are mutually linked", async () => {
+    negotiationState.neg42CounterpartyEmail = "sales+neg55@counterproai.com";
+    historyState.messageIds = ["msg-internal-linked"];
+    fetchOverride.handler = (url) =>
+      url.includes("/messages/msg-internal-linked")
+        ? new Response(JSON.stringify(buildFakeGmailMessage("msg-internal-linked", {
+            from: "sales+neg55@counterproai.com",
+            to: "sales+neg42@counterproai.com",
+            body: "Seller counter: $320,000.",
+          })), { status: 200 })
+        : null;
+
+    const { processNewMessages } = await import("@/app/api/webhooks/gmail/route");
+    await processNewMessages("200");
+
+    expect(savedMessages).toHaveLength(1);
+    expect(savedMessages[0].content).toBe("Seller counter: $320,000.");
+    expect(savedMessages[0].negotiation_id).toBe(42);
+  });
+
+  it("rejects alias-to-alias mail when negotiations are not mutually linked", async () => {
+    historyState.messageIds = ["msg-internal-unlinked"];
+    fetchOverride.handler = (url) =>
+      url.includes("/messages/msg-internal-unlinked")
+        ? new Response(JSON.stringify(buildFakeGmailMessage("msg-internal-unlinked", {
+            from: "sales+neg77@counterproai.com",
+            to: "sales+neg42@counterproai.com",
+            body: "Unlinked internal message",
           })), { status: 200 })
         : null;
 

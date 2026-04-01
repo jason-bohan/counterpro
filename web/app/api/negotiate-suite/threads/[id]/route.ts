@@ -66,6 +66,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const body = await req.json();
   const { status, counterparty_email, deadline_date, autonomous_mode, archived } = body;
+  const normalizedCounterpartyEmail =
+    counterparty_email !== undefined
+      ? (typeof counterparty_email === "string" && counterparty_email.trim() !== ""
+          ? counterparty_email.trim().toLowerCase()
+          : null)
+      : undefined;
 
   const validStatuses = ["active", "pending", "closed", "won", "lost"];
   if (status !== undefined && !validStatuses.includes(status)) {
@@ -89,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     UPDATE negotiations
     SET
       status = COALESCE(${status ?? null}, status),
-      counterparty_email = COALESCE(${counterparty_email ?? null}, counterparty_email),
+      counterparty_email = COALESCE(${normalizedCounterpartyEmail ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
       ${archived !== undefined ? sql`archived_at = ${archived === true ? sql`NOW()` : null}` : sql`archived_at = archived_at`},

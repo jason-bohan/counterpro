@@ -50,7 +50,7 @@ export type ParsedEmail = {
 };
 
 export type InboundRouting =
-  | { type: "negotiation"; negotiationId: number }
+  | { type: "negotiation"; negotiationId: number; sourceNegotiationId: number | null }
   | { type: "loop" }
   | { type: "unrelated" };
 
@@ -122,17 +122,28 @@ export function parseEmail(payload: GmailMessagePart): ParsedEmail {
 const ALIAS_DOMAIN = "counterproai.com";
 const ALIAS_PATTERN = new RegExp(`sales\\+neg(\\d+)@${ALIAS_DOMAIN.replace(".", "\\.")}`, "i");
 
-export function routeInboundEmail(from: string, to: string): InboundRouting {
-  // Block loops: emails from our own domain
-  if (from.includes(`@${ALIAS_DOMAIN}`)) return { type: "loop" };
-
-  const match = to.match(ALIAS_PATTERN);
-  if (!match) return { type: "unrelated" };
+export function extractNegotiationAliasId(value: string): number | null {
+  const match = value.match(ALIAS_PATTERN);
+  if (!match) return null;
 
   const negotiationId = parseInt(match[1], 10);
-  if (isNaN(negotiationId)) return { type: "unrelated" };
+  return Number.isNaN(negotiationId) ? null : negotiationId;
+}
 
-  return { type: "negotiation", negotiationId };
+export function routeInboundEmail(from: string, to: string): InboundRouting {
+  const negotiationId = extractNegotiationAliasId(to);
+  if (negotiationId == null) return { type: "unrelated" };
+
+  const sourceNegotiationId = extractNegotiationAliasId(from);
+  if (sourceNegotiationId === negotiationId) return { type: "loop" };
+
+  // Keep blocking other internal mailbox traffic unless it comes from a
+  // specific negotiation alias we can validate later.
+  if (sourceNegotiationId == null && from.includes(`@${ALIAS_DOMAIN}`)) {
+    return { type: "loop" };
+  }
+
+  return { type: "negotiation", negotiationId, sourceNegotiationId };
 }
 
 // ── First contact prompt builders ─────────────────────────────────────────

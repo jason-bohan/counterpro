@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
   const { address, counterpartyEmail, dealId, role } = await req.json();
+  const normalizedCounterpartyEmail =
+    typeof counterpartyEmail === "string" && counterpartyEmail.trim() !== ""
+      ? counterpartyEmail.trim().toLowerCase()
+      : null;
 
   if (!address || typeof address !== "string" || address.trim() === "") {
     return NextResponse.json({ error: "address is required" }, { status: 400 });
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const [thread] = await sql`
     INSERT INTO negotiations (clerk_user_id, deal_id, address, counterparty_email, role)
-    VALUES (${userId}, ${dealId ?? null}, ${address.trim()}, ${counterpartyEmail ?? null}, ${resolvedRole})
+    VALUES (${userId}, ${dealId ?? null}, ${address.trim()}, ${normalizedCounterpartyEmail}, ${resolvedRole})
     RETURNING id
   `;
 

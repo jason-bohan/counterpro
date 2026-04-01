@@ -131,6 +131,28 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     return;
   }
 
+  if (routing.sourceNegotiationId !== null) {
+    const [sourceNeg] = await sql`
+      SELECT id, alias_email, counterparty_email
+      FROM negotiations
+      WHERE id = ${routing.sourceNegotiationId}
+    `;
+
+    const targetAlias = String(neg.alias_email ?? "").toLowerCase();
+    const sourceAlias = String(sourceNeg?.alias_email ?? "").toLowerCase();
+    const targetExpectsSource = String(neg.counterparty_email ?? "").toLowerCase() === sourceAlias;
+    const sourceExpectsTarget = String(sourceNeg?.counterparty_email ?? "").toLowerCase() === targetAlias;
+
+    if (!sourceNeg || !targetAlias || !sourceAlias || !targetExpectsSource || !sourceExpectsTarget) {
+      await wlog(
+        "message_process",
+        `neg=${negotiationId} sourceNeg=${routing.sourceNegotiationId} internal alias not linked`,
+        "skip"
+      );
+      return;
+    }
+  }
+
   if (!body.trim()) {
     console.error(`[gmail-webhook] Empty body for message ${msgId}`);
     return;
