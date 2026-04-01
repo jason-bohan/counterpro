@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
 
 type Thread = {
@@ -49,6 +50,8 @@ export default function NegotiateSuitePage() {
   const [email, setEmail] = useState("");
   const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Thread | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newAliasEmail, setNewAliasEmail] = useState<string | null>(null);
   const [aliasCopied, setAliasCopied] = useState(false);
@@ -301,54 +304,90 @@ export default function NegotiateSuitePage() {
             <h2 className="text-lg font-semibold mb-4">Active negotiations</h2>
             <div className="flex flex-col gap-3">
               {threads.map(t => (
-                <Link key={t.id} href={`/negotiate/${t.id}`}>
-                  <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                    <CardContent className="py-4 flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        {/* Top row: address + badges */}
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="font-medium truncate">{t.address}</p>
-                          <Badge variant="secondary" className="text-xs capitalize shrink-0">
-                            {t.role ?? "Buyer"}
-                          </Badge>
-                          <Badge
-                            className={`text-xs shrink-0 ${
-                              t.status === "active"
-                                ? "bg-green-100 text-green-800 border border-green-200"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                            variant="outline"
-                          >
-                            {t.status === "active" ? "Active" : "Closed"}
-                          </Badge>
-                          {Number(t.pending_count) > 0 && (
-                            <Badge className="text-xs shrink-0 bg-orange-500 text-white border-0">
-                              {Number(t.pending_count)} new
+                <div key={t.id} className="group relative">
+                  <Link href={`/negotiate/${t.id}`}>
+                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                      <CardContent className="py-4 flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-medium truncate">{t.address}</p>
+                            <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                              {t.role ?? "Buyer"}
                             </Badge>
+                            <Badge
+                              className={`text-xs shrink-0 ${
+                                t.status === "active"
+                                  ? "bg-green-100 text-green-800 border border-green-200"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                              variant="outline"
+                            >
+                              {t.status === "active" ? "Active" : "Closed"}
+                            </Badge>
+                            {Number(t.pending_count) > 0 && (
+                              <Badge className="text-xs shrink-0 bg-orange-500 text-white border-0">
+                                {Number(t.pending_count)} new
+                              </Badge>
+                            )}
+                          </div>
+                          {t.last_message && (
+                            <p className="text-sm text-muted-foreground truncate max-w-lg">
+                              {t.last_message.slice(0, 80)}{t.last_message.length > 80 ? "…" : ""}
+                            </p>
                           )}
-                        </div>
-                        {/* Last message preview */}
-                        {t.last_message && (
-                          <p className="text-sm text-muted-foreground truncate max-w-lg">
-                            {t.last_message.slice(0, 80)}{t.last_message.length > 80 ? "…" : ""}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Updated {relativeTime(t.updated_at)}
+                            {t.counterparty_email && (
+                              <> · <span className="text-muted-foreground">{t.counterparty_email}</span></>
+                            )}
                           </p>
-                        )}
-                        {/* Meta row */}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Updated {relativeTime(t.updated_at)}
-                          {t.counterparty_email && (
-                            <> · <span className="text-muted-foreground">{t.counterparty_email}</span></>
-                          )}
-                        </p>
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">Open →</span>
-                    </CardContent>
-                  </Card>
-                </Link>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0 group-hover:hidden">Open →</span>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                  <button
+                    className="absolute right-4 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded"
+                    onClick={e => { e.preventDefault(); setArchiveTarget(t); }}
+                  >
+                    Archive
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         ) : null}
+
+        <AlertDialog open={!!archiveTarget} onOpenChange={open => { if (!open) setArchiveTarget(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Archive this negotiation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                &ldquo;{archiveTarget?.address}&rdquo; will be moved to your archive. You can still view it there but it won&apos;t appear in your active list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={archiving}
+                onClick={async () => {
+                  if (!archiveTarget) return;
+                  setArchiving(true);
+                  await fetch(`/api/negotiate-suite/threads/${archiveTarget.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ archived: true }),
+                  });
+                  setThreads(prev => prev.filter(t => t.id !== archiveTarget.id));
+                  setArchiveTarget(null);
+                  setArchiving(false);
+                }}
+              >
+                {archiving ? "Archiving…" : "Archive"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

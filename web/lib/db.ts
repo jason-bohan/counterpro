@@ -2,6 +2,20 @@ import { neon } from "@neondatabase/serverless";
 
 export const sql = neon(process.env.DATABASE_URL!);
 
+/** Run a single migration step. Logs and continues on failure so one bad
+ *  migration can never take down every API route. */
+async function m(label: string, query: Promise<unknown>) {
+  try {
+    await query;
+  } catch (e: unknown) {
+    // Duplicate-object errors (42P07 index already exists, 42701 column
+    // already exists) are harmless — log at debug level only.
+    const code = (e as { code?: string }).code;
+    if (code === "42P07" || code === "42701") return;
+    console.error(`[setupDatabase] migration "${label}" failed:`, e);
+  }
+}
+
 export async function setupDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS user_plans (
@@ -49,13 +63,13 @@ export async function setupDatabase() {
   `;
 
   // Add columns that may be missing from tables created before schema updates
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'buyer'`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS deadline_date TIMESTAMPTZ`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS contingencies JSONB DEFAULT '[]'`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS alias_email TEXT`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS autonomous_mode BOOLEAN NOT NULL DEFAULT FALSE`;
+  await m("negotiations.role", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'buyer'`);
+  await m("negotiations.status", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
+  await m("negotiations.deadline_date", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS deadline_date TIMESTAMPTZ`);
+  await m("negotiations.contingencies", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS contingencies JSONB DEFAULT '[]'`);
+  await m("negotiations.updated_at", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+  await m("negotiations.alias_email", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS alias_email TEXT`);
+  await m("negotiations.autonomous_mode", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS autonomous_mode BOOLEAN NOT NULL DEFAULT FALSE`);
 
   await sql`
     CREATE TABLE IF NOT EXISTS negotiation_messages (
@@ -99,16 +113,16 @@ export async function setupDatabase() {
     )
   `;
 
-  await sql`ALTER TABLE deals ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`;
+  await m("deals.archived_at", sql`ALTER TABLE deals ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`);
+  await m("negotiations.archived_at", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`);
 
-  await sql`ALTER TABLE user_plans ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+  await m("user_plans.stripe_customer_id", sql`ALTER TABLE user_plans ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
 
-  await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`;
-  await sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`;
+  await m("gmail_state.watch_expiration", sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_expiration TIMESTAMPTZ`);
+  await m("gmail_state.watch_email", sql`ALTER TABLE gmail_state ADD COLUMN IF NOT EXISTS watch_email TEXT`);
 
-  await sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT`;
-  await sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_message_id TEXT`;
+  await m("negotiation_messages.gmail_thread_id", sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT`);
+  await m("negotiation_messages.gmail_message_id", sql`ALTER TABLE negotiation_messages ADD COLUMN IF NOT EXISTS gmail_message_id TEXT`);
 
   await sql`
     CREATE TABLE IF NOT EXISTS negotiation_documents (
@@ -123,11 +137,11 @@ export async function setupDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS docs_neg_idx ON negotiation_documents (negotiation_id, created_at DESC)`;
-  await sql`ALTER TABLE negotiation_documents ADD COLUMN IF NOT EXISTS message_id INTEGER REFERENCES negotiation_messages(id) ON DELETE SET NULL`;
-  await sql`CREATE INDEX IF NOT EXISTS docs_msg_idx ON negotiation_documents (message_id) WHERE message_id IS NOT NULL`;
+  await m("docs_neg_idx", sql`CREATE INDEX IF NOT EXISTS docs_neg_idx ON negotiation_documents (negotiation_id, created_at DESC)`);
+  await m("negotiation_documents.message_id", sql`ALTER TABLE negotiation_documents ADD COLUMN IF NOT EXISTS message_id INTEGER REFERENCES negotiation_messages(id) ON DELETE SET NULL`);
+  await m("docs_msg_idx", sql`CREATE INDEX IF NOT EXISTS docs_msg_idx ON negotiation_documents (message_id) WHERE message_id IS NOT NULL`);
   // Deduplicate existing rows before creating the unique index (keep highest id per gmail_message_id)
-  await sql`
+  await m("dedup_gmail_msg_id", sql`
     DELETE FROM negotiation_messages
     WHERE gmail_message_id IS NOT NULL
     AND id NOT IN (
@@ -135,9 +149,9 @@ export async function setupDatabase() {
       WHERE gmail_message_id IS NOT NULL
       GROUP BY gmail_message_id
     )
-  `;
+  `);
   // Prevent duplicate inbound messages from the same Gmail message ID
-  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_gmail_msg_id ON negotiation_messages (gmail_message_id) WHERE gmail_message_id IS NOT NULL`;
+  await m("uq_gmail_msg_id", sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_gmail_msg_id ON negotiation_messages (gmail_message_id) WHERE gmail_message_id IS NOT NULL`);
 
   await sql`
     CREATE TABLE IF NOT EXISTS webhook_logs (
