@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
 import { put } from "@vercel/blob";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
+import { buildDocumentBlobPath } from "@/lib/utils";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -186,7 +187,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
       const attData = await attRes.json() as { data?: string };
       if (!attData.data) continue;
       const buf = Buffer.from(attData.data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-      const blobPath = `documents/${neg.clerk_user_id}/${negotiationId}/${Date.now()}-${att.filename}`;
+      const blobPath = buildDocumentBlobPath(neg.clerk_user_id, negotiationId, att.filename);
       const { url } = await put(blobPath, buf, { access: "public", contentType: att.mimeType });
       await sql`
         INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction, message_id)

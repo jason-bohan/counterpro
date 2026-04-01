@@ -6,6 +6,7 @@ import { getAccessToken, sendGmail as sendGmailLib, type GmailAttachment } from 
 import { put } from "@vercel/blob";
 import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
+import { buildDocumentBlobPath } from "@/lib/utils";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -191,7 +192,7 @@ export async function PUT(req: NextRequest) {
   // Save attachment to Blob and record it so users can access sent documents later
   if (sent && attachment) {
     try {
-      const blobPath = `documents/${userId}/${msg.negotiation_id}/${Date.now()}-${attachment.name}`;
+      const blobPath = buildDocumentBlobPath(userId, msg.negotiation_id, attachment.name);
       const { url } = await put(blobPath, attachment.data, {
         access: "public",
         contentType: attachment.mimeType,

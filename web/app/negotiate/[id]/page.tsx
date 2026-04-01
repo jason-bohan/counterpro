@@ -245,33 +245,38 @@ export default function NegotiateThreadPage() {
           .then(r => r.ok ? r.json() : null)
           .then(d => {
             if (!d) return;
-            setMessages(prev => {
-              // Only update if message count changed to avoid disrupting edits
-              if ((d.messages ?? []).length !== prev.length) {
-                // Re-evaluate pending draft from the latest data
-                const pending = (d.messages ?? []).find(
-                  (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
+            const nextMessages = d.messages ?? [];
+            const nextDocuments = d.documents ?? [];
+
+            if (nextMessages.length !== messages.length) {
+              setMessages(nextMessages);
+              setDocuments(nextDocuments);
+
+              const pending = nextMessages.find(
+                (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
+              );
+              if (pending) {
+                setPendingDraft(prev =>
+                  prev?.messageId === pending.id ? prev : { draft: pending.ai_draft!, messageId: pending.id }
                 );
-                if (pending) {
-                  setPendingDraft(prev =>
-                    prev?.messageId === pending.id ? prev : { draft: pending.ai_draft!, messageId: pending.id }
-                  );
-                  setEditedDraft(prev =>
-                    prev === (pendingDraft?.draft ?? "") ? pending.ai_draft! : prev
-                  );
-                } else {
-                  setPendingDraft(null);
-                }
-                return d.messages ?? [];
+                setEditedDraft(prev =>
+                  prev === (pendingDraft?.draft ?? "") ? pending.ai_draft! : prev
+                );
+              } else {
+                setPendingDraft(null);
               }
-              return prev;
-            });
+              return;
+            }
+
+            if (nextDocuments.length !== documents.length) {
+              setDocuments(nextDocuments);
+            }
           })
           .catch(() => {});
       }
     }, 20000);
     return () => clearInterval(interval);
-  }, [id, pendingDraft, editedDraft]);
+  }, [id, pendingDraft, editedDraft, documents.length, messages.length]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
