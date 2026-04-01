@@ -97,12 +97,13 @@ export async function PUT(req: NextRequest) {
     ({ messageId, approved, editedDraft, discard } = await req.json());
   }
 
-  // Verify ownership
+  // Verify ownership. The approved = false guard prevents a double-send from
+  // creating a second outbound record if the same messageId is submitted twice.
   const [msg] = await sql`
     SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email
     FROM negotiation_messages nm
     JOIN negotiations n ON n.id = nm.negotiation_id
-    WHERE nm.id = ${messageId} AND n.clerk_user_id = ${userId}
+    WHERE nm.id = ${messageId} AND n.clerk_user_id = ${userId} AND nm.approved = false
   `;
   if (!msg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -163,6 +164,7 @@ export async function PUT(req: NextRequest) {
     }
   }
 
+  let outboundMessageId: number = messageId;
   if (msg.direction === "proactive") {
     // Proactive messages are already outbound — update in-place so only one bubble appears
     await sql`
@@ -177,11 +179,13 @@ export async function PUT(req: NextRequest) {
       WHERE id = ${messageId}
     `;
 
-    // Save outbound reply as a separate record
-    await sql`
+    // Save outbound reply as a separate record; capture its id for document linking
+    const [outbound] = await sql`
       INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at)
       VALUES (${msg.negotiation_id}, 'outbound', ${plainText}, true, ${sent ? sql`NOW()` : null})
+      RETURNING id
     `;
+    outboundMessageId = outbound.id;
   }
 
   // Save attachment to Blob and record it so users can access sent documents later
@@ -193,8 +197,8 @@ export async function PUT(req: NextRequest) {
         contentType: attachment.mimeType,
       });
       await sql`
-        INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction)
-        VALUES (${msg.negotiation_id}, ${userId}, ${attachment.name}, ${url}, ${attachment.mimeType}, ${attachment.data.length}, 'sent')
+        INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction, message_id)
+        VALUES (${msg.negotiation_id}, ${userId}, ${attachment.name}, ${url}, ${attachment.mimeType}, ${attachment.data.length}, 'sent', ${outboundMessageId})
       `;
     } catch (err) {
       // Document storage failure must not block the response

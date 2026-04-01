@@ -677,21 +677,35 @@ export default function NegotiateThreadPage() {
                             const icon = doc.mime_type === "application/pdf" ? "📄" : doc.mime_type.startsWith("image/") ? "🖼️" : "📎";
                             const isOutbound = m.direction === "outbound" || m.direction === "proactive";
                             return (
-                              <a
-                                key={doc.id}
-                                href={doc.blob_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                                  isOutbound
-                                    ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
-                                    : "bg-muted hover:bg-muted/80 text-foreground"
-                                }`}
-                                title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
-                              >
-                                <span className="text-sm">{icon}</span>
-                                <span className="truncate max-w-[200px]">{doc.filename}</span>
-                              </a>
+                              <div key={doc.id} className="inline-flex items-center gap-1 group">
+                                <a
+                                  href={doc.blob_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                                    isOutbound
+                                      ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
+                                      : "bg-muted hover:bg-muted/80 text-foreground"
+                                  }`}
+                                  title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
+                                >
+                                  <span className="text-sm">{icon}</span>
+                                  <span className="truncate max-w-[200px]">{doc.filename}</span>
+                                </a>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Delete "${doc.filename}"?`)) return;
+                                    await fetch(`/api/negotiate-suite/documents/${doc.id}`, { method: "DELETE" });
+                                    load();
+                                  }}
+                                  className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1 rounded ${
+                                    isOutbound ? "text-primary-foreground/60 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive"
+                                  }`}
+                                  title="Delete document"
+                                >
+                                  ×
+                                </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -864,6 +878,13 @@ export default function NegotiateThreadPage() {
                             onChange={e => setRefinedDraft(r => r ? { ...r, text: e.target.value } : r)}
                             className="text-sm font-mono resize-y"
                           />
+                          {proactiveAttachment && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{proactiveAttachment.type === "application/pdf" ? "📄" : proactiveAttachment.type.startsWith("image/") ? "🖼️" : "📎"}</span>
+                              <span className="truncate max-w-[240px]">{proactiveAttachment.name}</span>
+                              <span className="text-muted-foreground/60">will be attached</span>
+                            </div>
+                          )}
                           <div className="flex gap-3 flex-wrap">
                             <Button
                               className="bg-green-600 hover:bg-green-700 text-white"

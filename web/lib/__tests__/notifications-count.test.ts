@@ -42,6 +42,10 @@ vi.mock("@/lib/db", () => ({
         gmail_message_id: null,
       }];
     }
+    // negotiate-suite PUT: INSERT outbound message RETURNING id
+    if (q.includes("INSERT INTO negotiation_messages")) {
+      return [{ id: 100 }];
+    }
     return [];
   }),
   setupDatabase: vi.fn().mockResolvedValue(undefined),

@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ type Plan = {
 
 function DashboardInner() {
   const { user } = useUser();
+  const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const searchParams = useSearchParams();
@@ -37,10 +38,15 @@ function DashboardInner() {
       .then((r) => r.json())
       .then((d) => {
         setDeals(d.deals ?? []);
-        setPlan(d.plan ?? null);
+        const p = d.plan ?? null;
+        setPlan(p);
+        // Suite users land on /negotiate — the dashboard is for the single-deal product
+        if (p?.plan === "suite" && !paymentSuccess) {
+          router.replace("/negotiate");
+        }
       })
       .catch(() => {});
-  }, []);
+  }, [router, paymentSuccess]);
 
   const [portalLoading, setPortalLoading] = useState(false);
 

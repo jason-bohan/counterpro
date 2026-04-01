@@ -1,0 +1,35 @@
+import { auth } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
+import { del } from "@vercel/blob";
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ docId: string }> }) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
+  const { docId } = await params;
+  const id = parseInt(docId, 10);
+  if (isNaN(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const [doc] = await sql`
+    SELECT id, blob_url FROM negotiation_documents
+    WHERE id = ${id} AND clerk_user_id = ${userId}
+  `;
+  if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Delete from Blob storage first; if it fails, don't delete the DB record
+  try {
+    await del(doc.blob_url);
+  } catch {
+    // Blob may already be gone — continue to remove the DB record
+  }
+
+  await sql`DELETE FROM negotiation_documents WHERE id = ${id}`;
+
+  return NextResponse.json({ ok: true });
+}

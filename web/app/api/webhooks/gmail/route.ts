@@ -153,12 +153,18 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   const draft =
     aiMessage.content[0].type === "text" ? aiMessage.content[0].text : "";
 
-  // Save inbound message + draft
+  // Save inbound message + draft. ON CONFLICT handles Gmail Pub/Sub re-deliveries.
   const [savedMsg] = await sql`
     INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft, gmail_thread_id, gmail_message_id)
     VALUES (${negotiationId}, 'inbound', ${body}, ${draft}, ${gmailThreadId}, ${gmailMessageId})
+    ON CONFLICT (gmail_message_id) DO NOTHING
     RETURNING id
   `;
+
+  if (!savedMsg) {
+    await wlog("process", `Message ${gmailMessageId} already saved — skipping duplicate`, "skip");
+    return;
+  }
 
   await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
 

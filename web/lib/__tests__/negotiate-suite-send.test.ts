@@ -30,7 +30,13 @@ vi.mock("@/lib/db", () => ({
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => {
     const q = strings[0];
     if (q.includes("SELECT")) {
-      const row = selectOverride.value ?? {
+      const override = selectOverride.value;
+      selectOverride.value = null; // reset after use
+      // Return empty array to simulate "not found" when override is explicitly set to approved:true
+      if (override && (override as Record<string, unknown>).approved === true) {
+        return Promise.resolve([]);
+      }
+      const row = override ?? {
         id: 99,
         negotiation_id: 1,
         clerk_user_id: "user_test",
@@ -43,12 +49,14 @@ vi.mock("@/lib/db", () => ({
         direction: "inbound",
         content: "Make an offer",
       };
-      selectOverride.value = null; // reset after use
       return Promise.resolve([row]);
     }
     if (q.includes("UPDATE negotiation_messages")) {
-      // values: [finalText, sentAt, messageId]
       sqlUpdates.push({ sentAt: values[1] });
+    }
+    // Return a row with an id for INSERT INTO negotiation_messages (outbound message insert uses RETURNING id)
+    if (q.includes("INSERT INTO negotiation_messages")) {
+      return Promise.resolve([{ id: 100 }]);
     }
     return Promise.resolve([]);
   },
@@ -162,6 +170,42 @@ describe("negotiate-suite PUT — sent_at", () => {
     expect(json.sent).toBe(false);
     expect(mockSendGmail).not.toHaveBeenCalled();
     expect(sqlUpdates[0].sentAt).toBeNull();
+  });
+});
+
+describe("negotiate-suite PUT — duplicate prevention", () => {
+  beforeEach(() => {
+    sqlUpdates.length = 0;
+    mockGetAccessToken.mockReset();
+    mockSendGmail.mockReset();
+    mockBlobPut.mockReset();
+  });
+
+  it("returns 404 when the message is already approved (approved = true)", async () => {
+    selectOverride.value = { ...mockMsg, approved: true };
+
+    const res = await PUT(makeRequest({ messageId: 99, approved: true, editedDraft: "" }));
+
+    expect(res.status).toBe(404);
+    expect(mockSendGmail).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 on the second call with the same messageId (no-row SELECT)", async () => {
+    // Simulate the SELECT returning no rows (message already approved / consumed)
+    selectOverride.value = null; // will return default row (approved: false) for first call
+    mockGetAccessToken.mockResolvedValue("token_abc");
+    mockSendGmail.mockResolvedValue(true);
+
+    // First approval succeeds
+    const res1 = await PUT(makeRequest({ messageId: 99, approved: true, editedDraft: "" }));
+    expect(res1.status).toBe(200);
+
+    // Second attempt: message now has approved=true so SELECT returns nothing
+    selectOverride.value = { ...mockMsg, approved: true };
+    const res2 = await PUT(makeRequest({ messageId: 99, approved: true, editedDraft: "" }));
+    expect(res2.status).toBe(404);
+    // Gmail should only have been called once
+    expect(mockSendGmail).toHaveBeenCalledOnce();
   });
 });
 

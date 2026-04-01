@@ -126,6 +126,8 @@ export async function setupDatabase() {
   await sql`CREATE INDEX IF NOT EXISTS docs_neg_idx ON negotiation_documents (negotiation_id, created_at DESC)`;
   await sql`ALTER TABLE negotiation_documents ADD COLUMN IF NOT EXISTS message_id INTEGER REFERENCES negotiation_messages(id) ON DELETE SET NULL`;
   await sql`CREATE INDEX IF NOT EXISTS docs_msg_idx ON negotiation_documents (message_id) WHERE message_id IS NOT NULL`;
+  // Prevent duplicate inbound messages from the same Gmail message ID
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_gmail_msg_id ON negotiation_messages (gmail_message_id) WHERE gmail_message_id IS NOT NULL`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS webhook_logs (
