@@ -19,7 +19,54 @@ export async function POST(req: NextRequest) {
   const allowed = await canUserRunSuite(userId);
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
-  const { negotiationId, newMessage } = await req.json();
+  const { negotiationId, newMessage, replyToMessageId } = await req.json();
+
+  // Generate a draft for an existing inbound message that has not been handled yet.
+  if (replyToMessageId) {
+    const [target] = await sql`
+      SELECT nm.*, n.address
+      FROM negotiation_messages nm
+      JOIN negotiations n ON n.id = nm.negotiation_id
+      WHERE nm.id = ${replyToMessageId}
+        AND nm.negotiation_id = ${negotiationId}
+        AND nm.direction = 'inbound'
+        AND nm.approved = false
+        AND n.clerk_user_id = ${userId}
+    `;
+    if (!target) return NextResponse.json({ error: "Reply target not found" }, { status: 404 });
+
+    const history = await sql`
+      SELECT direction, content FROM negotiation_messages
+      WHERE negotiation_id = ${negotiationId}
+        AND id <> ${replyToMessageId}
+      ORDER BY created_at ASC
+    `;
+
+    const prompt = buildNegotiationPrompt(
+      target.address,
+      history as Array<{ direction: string; content: string }>,
+      target.content
+    );
+
+    const message = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: SUITE_MAX_TOKENS,
+      system: SUITE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const draft = message.content[0].type === "text" ? message.content[0].text : "";
+
+    await sql`
+      UPDATE negotiation_messages
+      SET ai_draft = ${draft}
+      WHERE id = ${replyToMessageId}
+    `;
+
+    await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
+
+    return NextResponse.json({ draft, messageId: replyToMessageId });
+  }
 
   // Fetch negotiation + message history
   const [neg] = await sql`SELECT * FROM negotiations WHERE id = ${negotiationId} AND clerk_user_id = ${userId}`;
