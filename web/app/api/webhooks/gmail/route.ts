@@ -12,6 +12,11 @@ import { getClerkUser, sendNegotiationResultEmail } from "@/lib/notify";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const TERMINAL_NEGOTIATION_STATUSES = new Set(["closed", "won", "lost"]);
 
+function isAnthropicCreditError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("credit balance is too low") || msg.includes("invalid_request_error");
+}
+
 async function wlog(event_type: string, detail: string, status: "ok" | "error" | "skip" = "ok", error?: string) {
   try {
     await sql`INSERT INTO webhook_logs (event_type, detail, status, error) VALUES (${event_type}, ${detail}, ${status}, ${error ?? null})`;
@@ -161,36 +166,11 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   }
 
   const isTerminal = TERMINAL_NEGOTIATION_STATUSES.has(String(neg.status ?? "").toLowerCase());
-  let draft: string | null = null;
 
-  if (!isTerminal) {
-    // Get conversation history for AI
-    const messages = await sql`
-      SELECT direction, content FROM negotiation_messages
-      WHERE negotiation_id = ${negotiationId}
-      ORDER BY created_at ASC
-    `;
-
-    const prompt = buildNegotiationPrompt(
-      neg.address,
-      messages as Array<{ direction: string; content: string }>,
-      body
-    );
-
-    const aiMessage = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: SUITE_MAX_TOKENS,
-      system: SUITE_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    draft = aiMessage.content[0].type === "text" ? aiMessage.content[0].text : "";
-  }
-
-  // Save inbound message + draft. ON CONFLICT handles Gmail Pub/Sub re-deliveries.
+  // Save inbound first so Gmail retries do not loop forever if downstream AI work fails.
   const [savedMsg] = await sql`
     INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft, gmail_thread_id, gmail_message_id)
-    VALUES (${negotiationId}, 'inbound', ${body}, ${draft}, ${gmailThreadId}, ${gmailMessageId})
+    VALUES (${negotiationId}, 'inbound', ${body}, ${null}, ${gmailThreadId}, ${gmailMessageId})
     ON CONFLICT DO NOTHING
     RETURNING id
   `;
@@ -233,6 +213,50 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   }
 
   const agreementReached = detectAgreementReached(body);
+  let draft: string | null = null;
+
+  try {
+    const messages = await sql`
+      SELECT direction, content FROM negotiation_messages
+      WHERE negotiation_id = ${negotiationId}
+      ORDER BY created_at ASC
+    `;
+
+    const prompt = buildNegotiationPrompt(
+      neg.address,
+      messages as Array<{ direction: string; content: string }>,
+      body
+    );
+
+    const aiMessage = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: SUITE_MAX_TOKENS,
+      system: SUITE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    draft = aiMessage.content[0].type === "text" ? aiMessage.content[0].text : "";
+
+    await sql`
+      UPDATE negotiation_messages
+      SET ai_draft = ${draft}
+      WHERE id = ${savedMsg.id}
+    `;
+  } catch (err) {
+    const errorText = err instanceof Error ? err.message : String(err);
+    await wlog("draft_generation_failed", `neg=${negotiationId} msgId=${msgId}`, "error", errorText.slice(0, 300));
+
+    if (neg.autonomous_mode && isAnthropicCreditError(err)) {
+      await sql`
+        UPDATE negotiations
+        SET autonomous_mode = false, updated_at = NOW()
+        WHERE id = ${negotiationId}
+      `;
+      await wlog("autonomous_paused", `neg=${negotiationId} paused after Anthropic credit failure`, "error");
+    }
+
+    return;
+  }
 
   // Autonomous mode: send immediately without user approval
   if (neg.autonomous_mode) {

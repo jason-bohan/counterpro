@@ -17,6 +17,7 @@ const {
   historyState,
   mockSendGmail,
   mockSendNegotiationResultEmail,
+  mockAnthropicCreate,
   fetchOverride,
   negotiationState,
 } = vi.hoisted(() => ({
@@ -25,6 +26,9 @@ const {
   historyState: { messageIds: [] as string[] },
   mockSendGmail: vi.fn().mockResolvedValue(true),
   mockSendNegotiationResultEmail: vi.fn().mockResolvedValue(undefined),
+  mockAnthropicCreate: vi.fn().mockResolvedValue({
+    content: [{ type: "text", text: "Thank you for your offer. We propose $310,000." }],
+  }),
   fetchOverride: { handler: null as ((url: string) => Response | null) | null },
   negotiationState: {
     neg42CounterpartyEmail: "buyer@example.com",
@@ -68,6 +72,13 @@ vi.mock("@/lib/db", () => ({
       }
       return [];
     }
+    if (q.includes("UPDATE negotiations") && q.includes("SET autonomous_mode = false")) {
+      const negId = values[0];
+      if (negId === 99) {
+        negotiationState.neg99AutonomousMode = false;
+      }
+      return [];
+    }
     if (q.includes("SELECT id, alias_email, counterparty_email FROM negotiations")) {
       const negId = values[0];
       if (negId === 55) return [{ id: 55, alias_email: "sales+neg55@counterproai.com", counterparty_email: "sales+neg42@counterproai.com" }];
@@ -83,6 +94,13 @@ vi.mock("@/lib/db", () => ({
       const msg = { negotiation_id: values[0], direction: "inbound", content: values[1], ai_draft: values[2], id: savedMessages.length + 1 };
       savedMessages.push(msg as Record<string, unknown>);
       return [{ id: msg.id }];
+    }
+    if (q.includes("UPDATE negotiation_messages") && q.includes("SET ai_draft")) {
+      const draft = values[0];
+      const id = values[1];
+      const saved = savedMessages.find(msg => msg.id === id);
+      if (saved) saved.ai_draft = draft;
+      return [];
     }
     if (q.includes("INSERT INTO negotiation_messages") && q.includes("'outbound'")) {
       savedMessages.push({ negotiation_id: values[0], direction: "outbound", content: values[1], approved: true });
@@ -106,9 +124,7 @@ vi.mock("@/lib/notify", () => ({
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
-      create: vi.fn().mockResolvedValue({
-        content: [{ type: "text", text: "Thank you for your offer. We propose $310,000." }],
-      }),
+      create: mockAnthropicCreate,
     };
   },
 }));
@@ -119,6 +135,10 @@ beforeEach(() => {
   savedMessages.length = 0;
   mockSendGmail.mockClear();
   mockSendNegotiationResultEmail.mockClear();
+  mockAnthropicCreate.mockReset();
+  mockAnthropicCreate.mockResolvedValue({
+    content: [{ type: "text", text: "Thank you for your offer. We propose $310,000." }],
+  });
   sqlState.history_id = "100";
   fetchOverride.handler = null;
   negotiationState.neg42CounterpartyEmail = "buyer@example.com";
@@ -313,6 +333,32 @@ describe("Gmail webhook — inbound message processing", () => {
     );
     expect(negotiationState.neg99Status).toBe("closed");
     expect(negotiationState.neg99AutonomousMode).toBe(false);
+  });
+
+  it("saves inbound mail and pauses autopilot when Anthropic credits are exhausted", async () => {
+    historyState.messageIds = ["msg-credit-fail"];
+    mockAnthropicCreate.mockRejectedValueOnce(
+      new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}')
+    );
+    fetchOverride.handler = (url) =>
+      url.includes("/messages/msg-credit-fail")
+        ? new Response(JSON.stringify(buildFakeGmailMessage("msg-credit-fail", {
+            to: "sales+neg99@counterproai.com",
+            from: "seller@example.com",
+            body: "Counter at $124,000.",
+          })), { status: 200 })
+        : null;
+
+    const { processNewMessages } = await import("@/app/api/webhooks/gmail/route");
+    await processNewMessages("200");
+
+    expect(savedMessages).toHaveLength(1);
+    expect(savedMessages[0].direction).toBe("inbound");
+    expect(savedMessages[0].content).toBe("Counter at $124,000.");
+    expect(savedMessages[0].ai_draft).toBeNull();
+    expect(mockSendGmail).not.toHaveBeenCalled();
+    expect(negotiationState.neg99AutonomousMode).toBe(false);
+    expect(sqlState.history_id).toBe("200");
   });
 
   it("rejects non-alias internal emails from counterproai.com", async () => {
