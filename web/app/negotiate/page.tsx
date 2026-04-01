@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,10 +21,16 @@ type Thread = {
   role: string;
   counterparty_email: string | null;
   status: string;
+  alias_email?: string | null;
+  autonomous_mode?: boolean;
   updated_at: string;
   last_message: string | null;
   pending_count: number;
 };
+
+const SUITE_TOUR_STORAGE_KEY = "counterpro:tour:suite:v1";
+const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
+const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
 
 function relativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -55,6 +63,9 @@ export default function NegotiateSuitePage() {
   const [createError, setCreateError] = useState("");
   const [newAliasEmail, setNewAliasEmail] = useState<string | null>(null);
   const [aliasCopied, setAliasCopied] = useState(false);
+  const [tourReady, setTourReady] = useState(false);
+  const [hasVisitedThread, setHasVisitedThread] = useState(false);
+  const [hasCopiedAlias, setHasCopiedAlias] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,6 +81,12 @@ export default function NegotiateSuitePage() {
         setLoading(false);
       })
       .catch(() => { setLoadError(true); setLoading(false); });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setHasVisitedThread(window.localStorage.getItem(SUITE_THREAD_VISITED_KEY) === "true");
+    setHasCopiedAlias(window.localStorage.getItem(SUITE_ALIAS_COPIED_KEY) === "true");
   }, []);
 
   useEffect(() => {
@@ -104,6 +121,75 @@ export default function NegotiateSuitePage() {
     document.head.appendChild(script);
   }, [showNew]);
 
+  useEffect(() => {
+    if (!loading && !accessDenied) {
+      setTourReady(true);
+    }
+  }, [accessDenied, loading]);
+
+  const startSuiteTour = (markSeen = false) => {
+    if (typeof window === "undefined") return;
+
+    const steps = [
+      {
+        element: "[data-tour='suite-hero']",
+        popover: {
+          title: "This is your AI suite hub",
+          description: "Everything starts here: create negotiations, monitor activity, and jump into any live thread.",
+          side: "bottom" as const,
+          align: "start" as const,
+        },
+      },
+      {
+        element: "[data-tour='start-negotiation']",
+        popover: {
+          title: "Start a new negotiation",
+          description: "Create one thread per deal. Set the address, choose buyer or seller, and optionally add an external counterparty email.",
+          side: "bottom" as const,
+          align: "start" as const,
+        },
+      },
+      {
+        element: "[data-tour='alias-handoff']",
+        popover: {
+          title: "CounterPro gives each deal its own alias",
+          description: "After thread creation, CounterPro issues a unique email alias so replies can route into the correct negotiation automatically.",
+          side: "bottom" as const,
+          align: "start" as const,
+        },
+      },
+      {
+        element: "[data-tour='thread-list']",
+        popover: {
+          title: "Your active negotiations live here",
+          description: "Open any thread to review messages, pair CounterPro-to-CounterPro deals, manage auto-pilot, and approve or monitor responses.",
+          side: "top" as const,
+          align: "start" as const,
+        },
+      },
+    ].filter(step => document.querySelector(step.element));
+
+    if (steps.length === 0) return;
+
+    const walkthrough = driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.55,
+      showProgress: true,
+      smoothScroll: true,
+      doneBtnText: "Done",
+      nextBtnText: "Next",
+      prevBtnText: "Back",
+      steps,
+    });
+
+    if (markSeen) {
+      window.localStorage.setItem(SUITE_TOUR_STORAGE_KEY, "seen");
+    }
+
+    walkthrough.drive();
+  };
+
   const createThread = async () => {
     if (!address || !role) return;
     setCreating(true);
@@ -130,6 +216,86 @@ export default function NegotiateSuitePage() {
       setCreating(false);
     }
   };
+
+  const firstThread = threads[0] ?? null;
+  const hasCreatedNegotiation = threads.length > 0 || !!newAliasEmail;
+  const hasConnectedCounterparty = threads.some(thread => Boolean(thread.counterparty_email));
+  const hasEnabledAutopilot = threads.some(thread => Boolean(thread.autonomous_mode));
+  const hasStartedConversation = threads.some(thread => Boolean(thread.last_message));
+  const checklistItems = [
+    {
+      id: "create",
+      label: "Create your first negotiation",
+      description: "Set up one thread for each property or deal.",
+      complete: hasCreatedNegotiation,
+      actionLabel: showNew ? "Finish setup" : "Start now",
+      action: () => setShowNew(true),
+    },
+    {
+      id: "alias",
+      label: "Copy the negotiation alias",
+      description: "Share the generated alias so replies route into the right thread.",
+      complete: hasCopiedAlias,
+      actionLabel: newAliasEmail ? "Copy alias" : firstThread ? "Open thread" : "Create one first",
+      action: () => {
+        if (newAliasEmail && typeof window !== "undefined") {
+          navigator.clipboard.writeText(newAliasEmail).catch(() => {});
+          window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+          setHasCopiedAlias(true);
+          setAliasCopied(true);
+          window.setTimeout(() => setAliasCopied(false), 2500);
+          return;
+        }
+        if (firstThread) router.push(`/negotiate/${firstThread.id}`);
+      },
+      disabled: !newAliasEmail && !firstThread,
+    },
+    {
+      id: "open",
+      label: "Open a negotiation workspace",
+      description: "Jump into a live thread and review the deal sidebar.",
+      complete: hasVisitedThread,
+      actionLabel: firstThread ? "Open thread" : "Create one first",
+      action: () => {
+        if (firstThread) router.push(`/negotiate/${firstThread.id}`);
+      },
+      disabled: !firstThread,
+    },
+    {
+      id: "connect",
+      label: "Connect the other side",
+      description: "Add an external email or pair another CounterPro thread.",
+      complete: hasConnectedCounterparty,
+      actionLabel: firstThread ? "Set it up" : "Create one first",
+      action: () => {
+        if (firstThread) router.push(`/negotiate/${firstThread.id}`);
+      },
+      disabled: !firstThread,
+    },
+    {
+      id: "autopilot",
+      label: "Turn on auto-pilot",
+      description: "Let CounterPro reply automatically once the thread is configured.",
+      complete: hasEnabledAutopilot,
+      actionLabel: firstThread ? "Enable it" : "Create one first",
+      action: () => {
+        if (firstThread) router.push(`/negotiate/${firstThread.id}`);
+      },
+      disabled: !firstThread,
+    },
+    {
+      id: "message",
+      label: "Start the conversation",
+      description: "Send the first message or wait for the first inbound reply.",
+      complete: hasStartedConversation,
+      actionLabel: firstThread ? "Open thread" : "Create one first",
+      action: () => {
+        if (firstThread) router.push(`/negotiate/${firstThread.id}`);
+      },
+      disabled: !firstThread,
+    },
+  ];
+  const completedChecklistCount = checklistItems.filter(item => item.complete).length;
 
   if (accessDenied) {
     return (
@@ -164,18 +330,87 @@ export default function NegotiateSuitePage() {
 
       <main className="max-w-5xl mx-auto px-8 py-10">
         {/* Hero */}
-        <div className="mb-10">
+        <div className="mb-10" data-tour="suite-hero">
           <div className="flex items-center gap-2 mb-3">
             <Badge variant="outline" className="text-xs">Full Negotiation Suite</Badge>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Full Negotiation Suite</h1>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h1 className="text-3xl font-bold mb-2">Full Negotiation Suite</h1>
+            {tourReady && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={() => startSuiteTour(false)}
+              >
+                Take suite tour
+              </Button>
+            )}
+          </div>
           <p className="text-muted-foreground max-w-xl">
             AI manages your negotiation. You approve every response.
           </p>
         </div>
 
+        <Card className="mb-8 border-primary/20 bg-background/80">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="text-base">Get set up</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Complete the core steps once, then the suite starts feeling automatic.
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {completedChecklistCount}/{checklistItems.length} complete
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {checklistItems.map((item, index) => (
+              <div
+                key={item.id}
+                className={`flex items-start justify-between gap-4 rounded-lg border px-4 py-3 ${item.complete ? "border-green-200 bg-green-50/70" : "border-border bg-background"}`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${item.complete ? "bg-green-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                      {item.complete ? "✓" : index + 1}
+                    </span>
+                    <p className={`text-sm font-medium ${item.complete ? "text-green-900" : "text-foreground"}`}>{item.label}</p>
+                  </div>
+                  <p className={`mt-1 text-sm ${item.complete ? "text-green-800/80" : "text-muted-foreground"}`}>{item.description}</p>
+                </div>
+                <div className="shrink-0">
+                  {item.complete ? (
+                    <Badge variant="outline" className="border-green-300 bg-white text-green-700">Done</Badge>
+                  ) : (
+                    <Button size="sm" variant="outline" disabled={item.disabled} onClick={item.action}>
+                      {item.actionLabel}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end">
+              {tourReady && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => startSuiteTour(true)}
+                >
+                  Prefer a walkthrough?
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Start new negotiation */}
-        <div className="mb-8">
+        <div className="mb-8" data-tour="start-negotiation">
           {!showNew ? (
             <Button size="lg" onClick={() => setShowNew(true)}>
               + Start new negotiation
@@ -249,7 +484,7 @@ export default function NegotiateSuitePage() {
 
         {/* Alias email prompt — shown immediately after thread creation */}
         {newAliasEmail && (
-          <Card className="border-2 border-primary mb-6">
+          <Card className="border-2 border-primary mb-6" data-tour="alias-handoff">
             <CardContent className="py-6 space-y-3">
               <div className="flex items-center gap-2">
                 <Badge>New negotiation created</Badge>
@@ -265,6 +500,10 @@ export default function NegotiateSuitePage() {
                   variant="outline"
                   onClick={() => {
                     navigator.clipboard.writeText(newAliasEmail).catch(() => {});
+                    if (typeof window !== "undefined") {
+                      window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+                    }
+                    setHasCopiedAlias(true);
                     setAliasCopied(true);
                     setTimeout(() => setAliasCopied(false), 2500);
                   }}
@@ -300,7 +539,7 @@ export default function NegotiateSuitePage() {
             </CardContent>
           </Card>
         ) : threads.length > 0 ? (
-          <div>
+          <div data-tour="thread-list">
             <h2 className="text-lg font-semibold mb-4">Active negotiations</h2>
             <div className="flex flex-col gap-3">
               {threads.map(t => (
