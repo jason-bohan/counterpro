@@ -200,6 +200,7 @@ export default function NegotiateThreadPage() {
   const [offerAmount, setOfferAmount] = useState("");
   const [offerNotes, setOfferNotes] = useState("");
   const [generatingFirst, setGeneratingFirst] = useState(false);
+  const [generatingReply, setGeneratingReply] = useState(false);
 
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
@@ -385,6 +386,36 @@ export default function NegotiateThreadPage() {
 
     walkthrough.drive();
   }, []);
+
+  const latestInboundAwaitingReply = [...messages]
+    .reverse()
+    .find(m => m.direction === "inbound" && !m.approved);
+
+  const generateReplyFromLatestInbound = async () => {
+    if (!latestInboundAwaitingReply || !id) return;
+    setGeneratingReply(true);
+    try {
+      const res = await fetch("/api/negotiate-suite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          negotiationId: Number(id),
+          replyToMessageId: latestInboundAwaitingReply.id,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate AI reply.");
+      const { draft, messageId } = await res.json();
+      setPendingDraft({ draft, messageId });
+      setEditedDraft(draft);
+      setShowInbound(false);
+      setShowProactive(false);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to generate AI reply.");
+    } finally {
+      setGeneratingReply(false);
+    }
+  };
 
   useEffect(() => {
     if (loading || !negotiation) return;
@@ -1076,6 +1107,11 @@ export default function NegotiateThreadPage() {
                     <Button variant="outline" onClick={() => setShowInbound(true)}>
                       + Add their message
                     </Button>
+                    {latestInboundAwaitingReply && !latestInboundAwaitingReply.ai_draft && (
+                      <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
+                        {generatingReply ? "Generating..." : "Generate AI reply"}
+                      </Button>
+                    )}
                     <Button variant="outline" onClick={() => setShowProactive(true)}>
                       + Compose new message
                     </Button>
@@ -1119,7 +1155,9 @@ export default function NegotiateThreadPage() {
                         {refinedDraft ? "AI refined your message" : "Compose a new message"}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {refinedDraft ? "Review and send, or go back to edit your original." : "AI will refine your message for review."}
+                        {refinedDraft
+                          ? "Review and send, or go back to edit your original."
+                          : "Use this for a manual outbound note. For replies to the latest inbound message, use Generate AI reply."}
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
