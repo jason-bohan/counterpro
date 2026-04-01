@@ -210,10 +210,10 @@ function DashboardInner() {
               <p className="text-sm text-muted-foreground">One-time, no subscription required.</p>
             </CardHeader>
             <CardContent className="flex flex-col flex-1 gap-6 pt-2 pb-6">
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Full negotiation strategy</li>
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Email & verbal scripts</li>
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Walk-away point analysis</li>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Full negotiation strategy</span></li>
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Email &amp; verbal scripts</span></li>
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Walk-away point analysis</span></li>
               </ul>
               <div className="mt-auto space-y-3">
                 <Link href="/pricing">
@@ -232,13 +232,13 @@ function DashboardInner() {
               </div>
               <p className="text-sm text-muted-foreground">Unlimited deals, cancel anytime.</p>
             </CardHeader>
-            <CardContent className="flex flex-col flex-1 gap-4">
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Everything in Single deal</li>
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Unlimited deals per month</li>
-                <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Ideal for investors & agents</li>
+            <CardContent className="flex flex-col flex-1 gap-5">
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Everything in Single deal</span></li>
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Unlimited deals per month</span></li>
+                <li className="flex items-start gap-2.5 leading-6"><span className="mt-0.5 text-green-500 font-bold">✓</span><span>Ideal for investors &amp; agents</span></li>
               </ul>
-              <div className="mt-auto">
+              <div className="mt-auto pt-1">
                 <Link href="/pricing">
                   <Button className="w-full">Subscribe →</Button>
                 </Link>
