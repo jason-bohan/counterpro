@@ -140,6 +140,37 @@ function onboardingStorageKey(base: string, userId: string | null | undefined): 
   return userId ? `${base}:${userId}` : base;
 }
 
+function getLatestPendingInboundDraft(messages: Message[]): Message | null {
+  return [...messages]
+    .reverse()
+    .find((m) => m.direction === "inbound" && Boolean(m.ai_draft) && !m.approved) ?? null;
+}
+
+function getMessageProvenanceBadge(message: Message): { label: string; className: string } | null {
+  if (message.direction === "proactive" || message.direction === "outbound") {
+    if (message.ai_draft == null) {
+      return {
+        label: "AI Reply",
+        className: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+      };
+    }
+
+    if (message.ai_draft !== message.content) {
+      return {
+        label: "AI Refined",
+        className: "bg-sky-500/20 text-sky-300 border border-sky-500/30",
+      };
+    }
+
+    return {
+      label: "Manual",
+      className: "bg-zinc-500/15 text-zinc-300 border border-zinc-500/25",
+    };
+  }
+
+  return null;
+}
+
 export default function NegotiateThreadPage() {
   const { id } = useParams();
   const { user } = useUser();
@@ -235,9 +266,7 @@ export default function NegotiateThreadPage() {
         setEmailValue(isCounterProAliasEmail(nextCounterpartyEmail) ? "" : nextCounterpartyEmail);
         setPairingAliasValue(isCounterProAliasEmail(nextCounterpartyEmail) ? nextCounterpartyEmail : "");
         // Sync pending draft from DB
-        const pending = (d.messages ?? []).find(
-          (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
-        );
+        const pending = getLatestPendingInboundDraft(d.messages ?? []);
         if (pending) {
           setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
           setEditedDraft(pending.ai_draft!);
@@ -294,9 +323,7 @@ export default function NegotiateThreadPage() {
               setMessages(nextMessages);
               setDocuments(nextDocuments);
 
-              const pending = nextMessages.find(
-                (m: Message) => m.direction === "inbound" && m.ai_draft && !m.approved
-              );
+              const pending = getLatestPendingInboundDraft(nextMessages);
               if (pending) {
                 setPendingDraft(prev =>
                   prev?.messageId === pending.id ? prev : { draft: pending.ai_draft!, messageId: pending.id }
@@ -390,6 +417,30 @@ export default function NegotiateThreadPage() {
   const latestInboundAwaitingReply = [...messages]
     .reverse()
     .find(m => m.direction === "inbound" && !m.approved);
+
+  const regeneratePendingReply = async () => {
+    if (!pendingDraft || !id) return;
+    setGeneratingReply(true);
+    try {
+      const res = await fetch("/api/negotiate-suite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          negotiationId: Number(id),
+          replyToMessageId: pendingDraft.messageId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to regenerate AI reply.");
+      const { draft, messageId } = await res.json();
+      setPendingDraft({ draft, messageId });
+      setEditedDraft(draft);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to regenerate AI reply.");
+    } finally {
+      setGeneratingReply(false);
+    }
+  };
 
   const generateReplyFromLatestInbound = async () => {
     if (!latestInboundAwaitingReply || !id) return;
@@ -907,6 +958,7 @@ export default function NegotiateThreadPage() {
               )}
 
               {messages.filter(m => m.content !== "[First contact]").map(m => {
+                const provenanceBadge = getMessageProvenanceBadge(m);
                 const messageDocuments = documents.filter(doc =>
                   doc.message_id != null
                     ? doc.message_id === m.id
@@ -931,8 +983,10 @@ export default function NegotiateThreadPage() {
                           {" · "}
                           {relativeTime(m.created_at)}
                         </span>
-                        {(m.direction === "outbound" || (m.direction === "proactive" && m.ai_draft && m.ai_draft !== m.content)) && (
-                          <Badge variant="secondary" className="text-xs h-4 shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30">AI</Badge>
+                        {provenanceBadge && (
+                          <Badge variant="secondary" className={`text-xs h-4 shrink-0 ${provenanceBadge.className}`}>
+                            {provenanceBadge.label}
+                          </Badge>
                         )}
                         {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
                           <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
@@ -1048,6 +1102,9 @@ export default function NegotiateThreadPage() {
                     )}
                     <Button variant="outline" onClick={copyToClipboard}>
                       {copied ? "✓ Copied" : "Copy to clipboard"}
+                    </Button>
+                    <Button variant="outline" onClick={regeneratePendingReply} disabled={sending || generatingReply}>
+                      {generatingReply ? "Regenerating..." : "Regenerate"}
                     </Button>
                     {/* File attachment */}
                     <input
