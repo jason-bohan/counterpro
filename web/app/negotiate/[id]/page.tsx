@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
@@ -135,8 +136,15 @@ const NEGOTIATION_TOUR_STORAGE_KEY = "counterpro:tour:negotiation:v1";
 const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
 const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
 
+function onboardingStorageKey(base: string, userId: string | null | undefined): string {
+  return userId ? `${base}:${userId}` : base;
+}
+
 export default function NegotiateThreadPage() {
   const { id } = useParams();
+  const { user } = useUser();
+  const threadVisitedKey = onboardingStorageKey(SUITE_THREAD_VISITED_KEY, user?.id);
+  const aliasCopiedKey = onboardingStorageKey(SUITE_ALIAS_COPIED_KEY, user?.id);
   const [negotiation, setNegotiation] = useState<Negotiation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
@@ -381,10 +389,11 @@ export default function NegotiateThreadPage() {
   useEffect(() => {
     if (loading || !negotiation) return;
     if (typeof window === "undefined") return;
+    if (!user?.id) return;
 
     setTourReady(true);
-    window.localStorage.setItem(SUITE_THREAD_VISITED_KEY, "true");
-  }, [loading, negotiation]);
+    window.localStorage.setItem(threadVisitedKey, "true");
+  }, [loading, negotiation, threadVisitedKey, user?.id]);
 
   const submitInbound = async () => {
     if (!newMsg.trim()) return;
@@ -1339,7 +1348,7 @@ export default function NegotiateThreadPage() {
                         onClick={() => {
                           navigator.clipboard.writeText(negotiation.alias_email!).catch(() => {});
                           if (typeof window !== "undefined") {
-                            window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+                            window.localStorage.setItem(aliasCopiedKey, "true");
                           }
                           setAliasCopied(true);
                           setTimeout(() => setAliasCopied(false), 2500);

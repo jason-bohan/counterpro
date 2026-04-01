@@ -35,6 +35,10 @@ const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
 const SUITE_CHECKLIST_HIDDEN_KEY = "counterpro:onboarding:checklist-hidden";
 const SUITE_CHECKLIST_COMPLETED_KEY = "counterpro:onboarding:checklist-completed";
 
+function onboardingStorageKey(base: string, userId: string | null | undefined): string {
+  return userId ? `${base}:${userId}` : base;
+}
+
 function relativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -52,6 +56,11 @@ function relativeTime(dateStr: string): string {
 export default function NegotiateSuitePage() {
   const router = useRouter();
   const { user } = useUser();
+  const tourDismissedKey = onboardingStorageKey(SUITE_TOUR_DISMISSED_KEY, user?.id);
+  const threadVisitedKey = onboardingStorageKey(SUITE_THREAD_VISITED_KEY, user?.id);
+  const aliasCopiedKey = onboardingStorageKey(SUITE_ALIAS_COPIED_KEY, user?.id);
+  const checklistHiddenKey = onboardingStorageKey(SUITE_CHECKLIST_HIDDEN_KEY, user?.id);
+  const checklistCompletedKey = onboardingStorageKey(SUITE_CHECKLIST_COMPLETED_KEY, user?.id);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -91,12 +100,13 @@ export default function NegotiateSuitePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setTourDismissed(window.localStorage.getItem(SUITE_TOUR_DISMISSED_KEY) === "true");
-    setHasVisitedThread(window.localStorage.getItem(SUITE_THREAD_VISITED_KEY) === "true");
-    setHasCopiedAlias(window.localStorage.getItem(SUITE_ALIAS_COPIED_KEY) === "true");
-    setChecklistHidden(window.localStorage.getItem(SUITE_CHECKLIST_HIDDEN_KEY) === "true");
-    setChecklistCompleted(window.localStorage.getItem(SUITE_CHECKLIST_COMPLETED_KEY) === "true");
-  }, []);
+    if (!user?.id) return;
+    setTourDismissed(window.localStorage.getItem(tourDismissedKey) === "true");
+    setHasVisitedThread(window.localStorage.getItem(threadVisitedKey) === "true");
+    setHasCopiedAlias(window.localStorage.getItem(aliasCopiedKey) === "true");
+    setChecklistHidden(window.localStorage.getItem(checklistHiddenKey) === "true");
+    setChecklistCompleted(window.localStorage.getItem(checklistCompletedKey) === "true");
+  }, [aliasCopiedKey, checklistCompletedKey, checklistHiddenKey, threadVisitedKey, tourDismissedKey, user?.id]);
 
   useEffect(() => {
     if (!showNew) return;
@@ -249,7 +259,7 @@ export default function NegotiateSuitePage() {
       action: () => {
         if (newAliasEmail && typeof window !== "undefined") {
           navigator.clipboard.writeText(newAliasEmail).catch(() => {});
-          window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+          window.localStorage.setItem(aliasCopiedKey, "true");
           setHasCopiedAlias(true);
           setAliasCopied(true);
           window.setTimeout(() => setAliasCopied(false), 2500);
@@ -309,23 +319,23 @@ export default function NegotiateSuitePage() {
 
   useEffect(() => {
     if (!allChecklistComplete || checklistCompleted || typeof window === "undefined") return;
-    window.localStorage.setItem(SUITE_CHECKLIST_COMPLETED_KEY, "true");
-    window.localStorage.setItem(SUITE_CHECKLIST_HIDDEN_KEY, "true");
+    window.localStorage.setItem(checklistCompletedKey, "true");
+    window.localStorage.setItem(checklistHiddenKey, "true");
     setChecklistCompleted(true);
     setChecklistHidden(true);
-  }, [allChecklistComplete, checklistCompleted]);
+  }, [allChecklistComplete, checklistCompleted, checklistCompletedKey, checklistHiddenKey]);
 
   const hideChecklist = () => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(SUITE_CHECKLIST_HIDDEN_KEY, "true");
+      window.localStorage.setItem(checklistHiddenKey, "true");
     }
     setChecklistHidden(true);
   };
 
   const showChecklist = () => {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(SUITE_CHECKLIST_HIDDEN_KEY);
-      window.localStorage.removeItem(SUITE_CHECKLIST_COMPLETED_KEY);
+      window.localStorage.removeItem(checklistHiddenKey);
+      window.localStorage.removeItem(checklistCompletedKey);
     }
     setChecklistHidden(false);
     setChecklistCompleted(false);
@@ -333,7 +343,7 @@ export default function NegotiateSuitePage() {
 
   const dismissTourPrompt = () => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(SUITE_TOUR_DISMISSED_KEY, "true");
+      window.localStorage.setItem(tourDismissedKey, "true");
     }
     setTourDismissed(true);
   };
@@ -578,7 +588,7 @@ export default function NegotiateSuitePage() {
                   onClick={() => {
                     navigator.clipboard.writeText(newAliasEmail).catch(() => {});
                     if (typeof window !== "undefined") {
-                      window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+                      window.localStorage.setItem(aliasCopiedKey, "true");
                     }
                     setHasCopiedAlias(true);
                     setAliasCopied(true);
