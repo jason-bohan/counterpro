@@ -246,6 +246,32 @@ export default function NegotiateThreadPage() {
             if (!d) return;
             const nextMessages = d.messages ?? [];
             const nextDocuments = d.documents ?? [];
+            const nextNegotiation = d.negotiation ?? null;
+
+            if (nextNegotiation) {
+              setNegotiation(prev => {
+                if (!prev) return nextNegotiation;
+                if (
+                  prev.counterparty_email !== nextNegotiation.counterparty_email ||
+                  prev.autonomous_mode !== nextNegotiation.autonomous_mode ||
+                  prev.status !== nextNegotiation.status ||
+                  prev.paired_counterparty_confirmed !== nextNegotiation.paired_counterparty_confirmed ||
+                  prev.paired_counterparty_address !== nextNegotiation.paired_counterparty_address ||
+                  prev.paired_counterparty_role !== nextNegotiation.paired_counterparty_role
+                ) {
+                  return nextNegotiation;
+                }
+                return prev;
+              });
+
+              const nextCounterpartyEmail = nextNegotiation.counterparty_email ?? "";
+              if (!editingEmail) {
+                setEmailValue(isCounterProAliasEmail(nextCounterpartyEmail) ? "" : nextCounterpartyEmail);
+              }
+              if (!editingPairing) {
+                setPairingAliasValue(isCounterProAliasEmail(nextCounterpartyEmail) ? nextCounterpartyEmail : "");
+              }
+            }
 
             if (nextMessages.length !== messages.length) {
               setMessages(nextMessages);
@@ -275,7 +301,7 @@ export default function NegotiateThreadPage() {
       }
     }, 20000);
     return () => clearInterval(interval);
-  }, [id, pendingDraft, editedDraft, documents.length, messages.length]);
+  }, [id, pendingDraft, editedDraft, documents.length, messages.length, editingEmail, editingPairing]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1301,6 +1327,19 @@ export default function NegotiateThreadPage() {
                           >
                             {negotiation.paired_counterparty_confirmed ? "Reciprocal pairing confirmed" : "Waiting for reciprocal pairing"}
                           </Badge>
+                          {!negotiation.paired_counterparty_confirmed && (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                Waiting for the other CounterPro thread to pair back. This updates automatically.
+                              </p>
+                              <button
+                                onClick={() => load()}
+                                className="text-xs text-primary hover:underline shrink-0"
+                              >
+                                Check now
+                              </button>
+                            </div>
+                          )}
                           {negotiation.paired_counterparty_address && (
                             <p className="text-xs text-muted-foreground">
                               Linked to {negotiation.paired_counterparty_role ?? "counterparty"} thread:

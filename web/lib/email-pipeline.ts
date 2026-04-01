@@ -235,6 +235,29 @@ Refine this message into a professional, strategic email that:
 Return the refined message as the email body (no subject line needed):`;
 }
 
+const AGREEMENT_PATTERNS = [
+  /\bwe have a deal\b/i,
+  /\bi(?:'| wi)?ll accept\b/i,
+  /\baccepted\b/i,
+  /\bagree(?:d|ment)?\b/i,
+  /\bready to move forward\b/i,
+  /\bformal contract\b/i,
+  /\bnext steps\b/i,
+];
+
+export function detectAgreementReached(text: string): boolean {
+  const normalized = text.trim();
+  return AGREEMENT_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+export function extractCurrencyAmount(text: string): number | null {
+  const matches = Array.from(text.matchAll(/\$?\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d{2})?/g));
+  if (matches.length === 0) return null;
+  const raw = matches[matches.length - 1][1];
+  const numeric = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 // ── Markdown stripping ─────────────────────────────────────────────────────
 
 /**

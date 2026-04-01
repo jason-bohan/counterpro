@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase } from "@/lib/db";
 import { getAccessToken, sendGmail } from "@/lib/gmail";
-import { stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
+import { stripMarkdown, stripAiPreamble, detectAgreementReached, extractCurrencyAmount } from "@/lib/email-pipeline";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT } from "@/lib/email-pipeline";
 import { put } from "@vercel/blob";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 import { buildDocumentBlobPath } from "@/lib/utils";
+import { getClerkUser, sendNegotiationResultEmail } from "@/lib/notify";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const TERMINAL_NEGOTIATION_STATUSES = new Set(["closed", "won", "lost"]);
 
 async function wlog(event_type: string, detail: string, status: "ok" | "error" | "skip" = "ok", error?: string) {
   try {
@@ -158,28 +160,32 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     return;
   }
 
-  // Get conversation history for AI
-  const messages = await sql`
-    SELECT direction, content FROM negotiation_messages
-    WHERE negotiation_id = ${negotiationId}
-    ORDER BY created_at ASC
-  `;
+  const isTerminal = TERMINAL_NEGOTIATION_STATUSES.has(String(neg.status ?? "").toLowerCase());
+  let draft: string | null = null;
 
-  const prompt = buildNegotiationPrompt(
-    neg.address,
-    messages as Array<{ direction: string; content: string }>,
-    body
-  );
+  if (!isTerminal) {
+    // Get conversation history for AI
+    const messages = await sql`
+      SELECT direction, content FROM negotiation_messages
+      WHERE negotiation_id = ${negotiationId}
+      ORDER BY created_at ASC
+    `;
 
-  const aiMessage = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: SUITE_MAX_TOKENS,
-    system: SUITE_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
-  });
+    const prompt = buildNegotiationPrompt(
+      neg.address,
+      messages as Array<{ direction: string; content: string }>,
+      body
+    );
 
-  const draft =
-    aiMessage.content[0].type === "text" ? aiMessage.content[0].text : "";
+    const aiMessage = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: SUITE_MAX_TOKENS,
+      system: SUITE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    draft = aiMessage.content[0].type === "text" ? aiMessage.content[0].text : "";
+  }
 
   // Save inbound message + draft. ON CONFLICT handles Gmail Pub/Sub re-deliveries.
   const [savedMsg] = await sql`
@@ -220,10 +226,18 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     }
   }
 
+  if (isTerminal) {
+    await sql`UPDATE negotiation_messages SET approved = true WHERE id = ${savedMsg.id}`;
+    await wlog("autonomous_terminal_skip", `neg=${negotiationId} already terminal — no reply sent`, "skip");
+    return;
+  }
+
+  const agreementReached = detectAgreementReached(body);
+
   // Autonomous mode: send immediately without user approval
   if (neg.autonomous_mode) {
     await wlog("autonomous", `neg=${negotiationId} — auto-sending draft`);
-    const plainText = stripAiPreamble(stripMarkdown(draft));
+    const plainText = stripAiPreamble(stripMarkdown(draft ?? ""));
     // Fall back to system account if the user hasn't connected their own Gmail
     const sendAsUserId = (await getAccessToken(neg.clerk_user_id))
       ? neg.clerk_user_id
@@ -247,7 +261,32 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
           VALUES (${negotiationId}, 'outbound', ${plainText}, true, NOW())
         `;
         await wlog("autonomous_sent", `neg=${negotiationId} to=${neg.counterparty_email}`);
-        // Email notifications removed - Resend functionality disabled
+
+        if (agreementReached) {
+          await sql`
+            UPDATE negotiations
+            SET status = 'closed', autonomous_mode = false, updated_at = NOW()
+            WHERE id = ${negotiationId}
+          `;
+          await wlog("agreement_reached", `neg=${negotiationId} autopilot paused after agreement`);
+
+          const user = await getClerkUser(neg.clerk_user_id);
+          if (user) {
+            const agreedPrice = extractCurrencyAmount(body) ?? extractCurrencyAmount(plainText);
+            await sendNegotiationResultEmail({
+              to: user.email,
+              firstName: user.firstName,
+              address: neg.address,
+              negotiationId,
+              agreedPrice,
+              counterpartyLabel: fromHeader,
+            });
+            await wlog("agreement_email", `neg=${negotiationId} notified=${user.email}`);
+          } else {
+            await wlog("agreement_email", `neg=${negotiationId} no primary user email found`, "error");
+          }
+        }
+
         return;
       } else {
         await wlog("autonomous_send_failed", `neg=${negotiationId}`, "error");
@@ -257,8 +296,32 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     }
   }
 
-  // Email notifications removed - Resend functionality disabled
-  await wlog("draft_ready", `neg=${negotiationId} draft created - notifications disabled`);
+  if (agreementReached) {
+    await sql`
+      UPDATE negotiations
+      SET status = 'closed', autonomous_mode = false, updated_at = NOW()
+      WHERE id = ${negotiationId}
+    `;
+    await wlog("agreement_reached", `neg=${negotiationId} agreement detected — autopilot paused`);
+
+    const user = await getClerkUser(neg.clerk_user_id);
+    if (user) {
+      const agreedPrice = extractCurrencyAmount(body);
+      await sendNegotiationResultEmail({
+        to: user.email,
+        firstName: user.firstName,
+        address: neg.address,
+        negotiationId,
+        agreedPrice,
+        counterpartyLabel: fromHeader,
+      });
+      await wlog("agreement_email", `neg=${negotiationId} notified=${user.email}`);
+    } else {
+      await wlog("agreement_email", `neg=${negotiationId} no primary user email found`, "error");
+    }
+  } else {
+    await wlog("draft_ready", `neg=${negotiationId} draft created - notifications disabled`);
+  }
 }
 
 export async function POST(req: NextRequest) {
