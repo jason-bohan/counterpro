@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -129,6 +131,10 @@ function isOverdue(dueDateStr: string): boolean {
   return new Date(dueDateStr) < new Date();
 }
 
+const NEGOTIATION_TOUR_STORAGE_KEY = "counterpro:tour:negotiation:v1";
+const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
+const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
+
 export default function NegotiateThreadPage() {
   const { id } = useParams();
   const [negotiation, setNegotiation] = useState<Negotiation | null>(null);
@@ -191,6 +197,7 @@ export default function NegotiateThreadPage() {
   const [dlLabel, setDlLabel] = useState("");
   const [dlDate, setDlDate] = useState("");
   const [savingDeadline, setSavingDeadline] = useState(false);
+  const [tourReady, setTourReady] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -306,6 +313,77 @@ export default function NegotiateThreadPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingDraft]);
+
+  const startTour = useCallback((markSeen = false) => {
+    if (typeof window === "undefined") return;
+
+    const steps = [
+      {
+        element: "[data-tour='alias-email']",
+        popover: {
+          title: "Share this alias",
+          description: "This is the negotiation-specific inbox. Use it for external emails or as the link point for another CounterPro thread.",
+          side: "left" as const,
+          align: "start" as const,
+        },
+      },
+      {
+        element: "[data-tour='pairing']",
+        popover: {
+          title: "Pair CounterPro threads",
+          description: "Paste another CounterPro alias here when both parties are using the app. Once both sides pair each other, bot-to-bot negotiation can start safely.",
+          side: "left" as const,
+          align: "start" as const,
+        },
+      },
+      {
+        element: "[data-tour='autopilot']",
+        popover: {
+          title: "Set auto-pilot rules",
+          description: "Turn this on when you want AI to reply automatically. CounterPro pauses it after a detected agreement so the bots do not keep saying goodbye forever.",
+          side: "left" as const,
+          align: "center" as const,
+        },
+      },
+      {
+        element: "[data-tour='thread']",
+        popover: {
+          title: "Track everything here",
+          description: "This thread is the source of truth for replies, attachments, and agreement messages, even when the mail flow is happening in the background.",
+          side: "right" as const,
+          align: "start" as const,
+        },
+      },
+    ].filter(step => document.querySelector(step.element));
+
+    if (steps.length === 0) return;
+
+    const walkthrough = driver({
+      animate: true,
+      allowClose: true,
+      overlayOpacity: 0.55,
+      showProgress: true,
+      smoothScroll: true,
+      doneBtnText: "Done",
+      nextBtnText: "Next",
+      prevBtnText: "Back",
+      steps,
+    });
+
+    if (markSeen) {
+      window.localStorage.setItem(NEGOTIATION_TOUR_STORAGE_KEY, "seen");
+    }
+
+    walkthrough.drive();
+  }, []);
+
+  useEffect(() => {
+    if (loading || !negotiation) return;
+    if (typeof window === "undefined") return;
+
+    setTourReady(true);
+    window.localStorage.setItem(SUITE_THREAD_VISITED_KEY, "true");
+  }, [loading, negotiation]);
 
   const submitInbound = async () => {
     if (!newMsg.trim()) return;
@@ -658,7 +736,7 @@ export default function NegotiateThreadPage() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* LEFT — Chat thread */}
-          <div className="flex-1 min-w-0 flex flex-col gap-4">
+          <div className="flex-1 min-w-0 flex flex-col gap-4" data-tour="thread">
 
             {/* Message thread */}
             <div className="flex flex-col gap-3">
@@ -1194,9 +1272,22 @@ export default function NegotiateThreadPage() {
             {/* Deal info */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Deal Info
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Deal Info
+                  </CardTitle>
+                  {tourReady && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => startTour(false)}
+                    >
+                      Take tour
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div>
@@ -1208,7 +1299,7 @@ export default function NegotiateThreadPage() {
                   <Badge variant="secondary" className="capitalize text-xs">{negotiation.role}</Badge>
                 </div>
                 {negotiation.alias_email && (
-                  <div>
+                  <div data-tour="alias-email">
                     <p className="text-xs text-muted-foreground mb-0.5">Your negotiation email</p>
                     <p className="text-xs text-muted-foreground mb-1">Tell the other party to email this address</p>
                     <div className="flex items-center gap-2">
@@ -1216,6 +1307,9 @@ export default function NegotiateThreadPage() {
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(negotiation.alias_email!).catch(() => {});
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(SUITE_ALIAS_COPIED_KEY, "true");
+                          }
                           setAliasCopied(true);
                           setTimeout(() => setAliasCopied(false), 2500);
                         }}
@@ -1269,7 +1363,7 @@ export default function NegotiateThreadPage() {
                     </div>
                   )}
                 </div>
-                <div className="pt-2 border-t">
+                <div className="pt-2 border-t" data-tour="pairing">
                   <p className="text-xs text-muted-foreground mb-0.5">CounterPro pairing</p>
                   <p className="text-xs text-muted-foreground mb-2">
                     Link this negotiation to another CounterPro thread using its alias email.
@@ -1353,7 +1447,7 @@ export default function NegotiateThreadPage() {
                   )}
                 </div>
                 {/* Autonomous mode toggle */}
-                <div className="pt-2 border-t">
+                <div className="pt-2 border-t" data-tour="autopilot">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-medium leading-tight">Auto-pilot mode</p>
