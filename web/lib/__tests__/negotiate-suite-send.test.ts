@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-// Use undici's own File class — the global File may differ across Node.js versions
-// and won't pass undici's internal webidl.is.File() check in older releases.
-import { File as UndiciFile } from "undici";
 
 // Hoisted so they're accessible inside vi.mock factories
 const { sqlUpdates, mockGetAccessToken, mockSendGmail, mockBlobPut, selectOverride } = vi.hoisted(() => {
@@ -105,12 +102,41 @@ function makeRequest(body: object) {
   });
 }
 
+/**
+ * Build a real multipart/form-data request by hand.
+ * This avoids the FormData + NextRequest Content-Type header problem that
+ * arises when the test's FormData class (npm undici) differs from the one
+ * Node.js core uses internally — causing webidl.is.File() to reject the
+ * value or the Content-Type header to be absent.
+ */
 function makeFormRequest(fields: Record<string, string>, file?: { name: string; type: string; content: string }) {
-  const form = new FormData();
-  for (const [k, v] of Object.entries(fields)) form.append(k, v);
-  // Use undici's own File class — ensures webidl.is.File() passes in all Node.js/undici versions
-  if (file) form.append("attachment", new UndiciFile([file.content], file.name, { type: file.type }));
-  return new NextRequest("http://localhost/api/negotiate-suite", { method: "PUT", body: form });
+  const boundary = "test_boundary_cp";
+  const parts: Buffer[] = [];
+
+  for (const [k, v] of Object.entries(fields)) {
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`
+    ));
+  }
+
+  if (file) {
+    const fileBytes = Buffer.from(file.content, "utf8");
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="attachment"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`
+    ));
+    parts.push(fileBytes);
+    parts.push(Buffer.from("\r\n"));
+  }
+
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+  const body = Buffer.concat(parts);
+
+  return new NextRequest("http://localhost/api/negotiate-suite", {
+    method: "PUT",
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+    body,
+  });
 }
 
 describe("negotiate-suite PUT — sent_at", () => {
