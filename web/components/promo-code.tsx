@@ -45,19 +45,29 @@ export function PromoCode({ onRedeemed }: { onRedeemed?: () => void }) {
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="rounded-lg border border-border bg-muted/30 p-2.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/25">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
           placeholder="Enter code"
           value={code}
           onChange={e => { setCode(e.target.value.toUpperCase()); setStatus("idle"); setMessage(""); }}
           onKeyDown={e => e.key === "Enter" && redeem()}
-          className={`uppercase tracking-widest ${status === "error" ? "border-destructive" : ""}`}
+          className={`uppercase tracking-[0.2em] bg-background ${status === "error" ? "border-destructive" : ""}`}
         />
-        <Button variant="outline" onClick={redeem} disabled={status === "loading" || !code.trim()}>
+        <Button variant="outline" onClick={redeem} disabled={status === "loading" || !code.trim()} className="sm:px-4">
           {status === "loading" ? "..." : "Apply"}
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="shrink-0">✕</Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpen(false)}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+          aria-label="Close promo code form"
+        >
+          ✕
+        </Button>
+        </div>
       </div>
       {status === "error" && <p className="text-xs text-destructive">{message}</p>}
     </div>
