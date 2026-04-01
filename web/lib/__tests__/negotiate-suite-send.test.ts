@@ -197,7 +197,7 @@ describe("negotiate-suite PUT — file attachment", () => {
     mockBlobPut.mockResolvedValue({ url: "https://blob.vercel.com/test/agreement.pdf" });
   });
 
-  it.skip("sends the email with an attachment when a file is included", async () => {
+  it("sends the email with an attachment when a file is included", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
     mockBlobPut.mockResolvedValue({ url: "https://mock-blob-url.com/file.pdf" });
@@ -216,7 +216,7 @@ describe("negotiate-suite PUT — file attachment", () => {
     expect(Buffer.isBuffer(attachments[0].data)).toBe(true);
   });
 
-  it.skip("uploads the file to Blob after a successful send", async () => {
+  it("uploads the file to Blob after a successful send", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
     mockBlobPut.mockResolvedValue({ url: "https://mock-blob-url.com/file.pdf" });
@@ -234,7 +234,7 @@ describe("negotiate-suite PUT — file attachment", () => {
     expect(opts.contentType).toBe("application/pdf");
   });
 
-  it.skip("does NOT upload to Blob when Gmail send fails", async () => {
+  it("does NOT upload to Blob when Gmail send fails", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(false);
 
@@ -246,7 +246,7 @@ describe("negotiate-suite PUT — file attachment", () => {
     expect(mockBlobPut).not.toHaveBeenCalled();
   });
 
-  it.skip("still returns ok if Blob upload throws — send is not blocked", async () => {
+  it("still returns ok if Blob upload throws — send is not blocked", async () => {
     mockGetAccessToken.mockResolvedValue("token_abc");
     mockSendGmail.mockResolvedValue(true);
     mockBlobPut.mockRejectedValue(new Error("Blob service unavailable"));
