@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { CLAUDE_MODEL } from "@/lib/constants";
 
 type StatusLevel = "ok" | "warn" | "error";
 
@@ -55,7 +56,7 @@ function checkEnvKey(
   };
 }
 
-async function checkAnthropic(): Promise<ApiCheck> {
+async function checkAnthropicApi(): Promise<ApiCheck> {
   const base = checkEnvKey("Anthropic (Claude AI)", "ANTHROPIC_API_KEY", { prefix: "sk-ant-" });
   if (base.status !== "ok") return base;
 
@@ -77,6 +78,62 @@ async function checkAnthropic(): Promise<ApiCheck> {
     };
   } catch {
     return { ...base, detail: `${base.detail} · Could not reach API` };
+  }
+}
+
+async function checkAnthropicModelRequest(): Promise<ApiCheck> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    return {
+      name: "Anthropic model request",
+      status: "warn",
+      detail: "Skipped because ANTHROPIC_API_KEY is not set",
+      hint: "Set ANTHROPIC_API_KEY to validate real Claude request health",
+    };
+  }
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 8,
+        messages: [{ role: "user", content: "Reply with OK" }],
+      }),
+    });
+
+    if (res.ok) {
+      return {
+        name: "Anthropic model request",
+        status: "ok",
+        detail: `${CLAUDE_MODEL} test request succeeded`,
+      };
+    }
+
+    const err = await res.json().catch(() => ({}));
+    const message = err?.error?.message ?? "unknown error";
+    const lowCredits =
+      typeof message === "string" &&
+      message.toLowerCase().includes("credit balance is too low");
+
+    return {
+      name: "Anthropic model request",
+      status: lowCredits ? "error" : "warn",
+      detail: `${CLAUDE_MODEL} request failed (${res.status}): ${message}`,
+      hint: lowCredits ? "Anthropic billing or credits need attention before AI replies will work" : undefined,
+    };
+  } catch (err) {
+    return {
+      name: "Anthropic model request",
+      status: "warn",
+      detail: err instanceof Error ? err.message : "Request failed",
+      hint: "The API key exists, but a real Claude request could not be completed",
+    };
   }
 }
 
@@ -159,15 +216,17 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [neon, anthropic, stripe] = await Promise.all([
+  const [neon, anthropicApi, anthropicModel, stripe] = await Promise.all([
     checkNeon(),
-    checkAnthropic(),
+    checkAnthropicApi(),
+    checkAnthropicModelRequest(),
     checkStripe(),
   ]);
 
   const checks: ApiCheck[] = [
     neon,
-    anthropic,
+    anthropicApi,
+    anthropicModel,
     stripe,
     checkClerk(),
     checkGmail(),
