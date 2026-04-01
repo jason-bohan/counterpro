@@ -16,6 +16,7 @@ const {
   sqlState,
   historyState,
   mockSendGmail,
+  mockSendNegotiationResultEmail,
   fetchOverride,
   negotiationState,
 } = vi.hoisted(() => ({
@@ -23,9 +24,13 @@ const {
   sqlState: { history_id: "100" },
   historyState: { messageIds: [] as string[] },
   mockSendGmail: vi.fn().mockResolvedValue(true),
+  mockSendNegotiationResultEmail: vi.fn().mockResolvedValue(undefined),
   fetchOverride: { handler: null as ((url: string) => Response | null) | null },
   negotiationState: {
     neg42CounterpartyEmail: "buyer@example.com",
+    neg42Status: "active",
+    neg99Status: "active",
+    neg99AutonomousMode: true,
   },
 }));
 
@@ -48,10 +53,19 @@ vi.mock("@/lib/db", () => ({
     }
     if (q.includes("SELECT * FROM negotiations WHERE id")) {
       const negId = values[0];
-      if (negId === 42) return [{ id: 42, clerk_user_id: "user_owner", address: "123 Oak Street", counterparty_email: negotiationState.neg42CounterpartyEmail, alias_email: "sales+neg42@counterproai.com", autonomous_mode: false }];
-      if (negId === 99) return [{ id: 99, clerk_user_id: "user_owner", address: "456 Elm Ave", counterparty_email: "seller@example.com", alias_email: "sales+neg99@counterproai.com", autonomous_mode: true }];
+      if (negId === 42) return [{ id: 42, clerk_user_id: "user_owner", address: "123 Oak Street", counterparty_email: negotiationState.neg42CounterpartyEmail, alias_email: "sales+neg42@counterproai.com", autonomous_mode: false, status: negotiationState.neg42Status }];
+      if (negId === 99) return [{ id: 99, clerk_user_id: "user_owner", address: "456 Elm Ave", counterparty_email: "seller@example.com", alias_email: "sales+neg99@counterproai.com", autonomous_mode: negotiationState.neg99AutonomousMode, status: negotiationState.neg99Status }];
       if (negId === 55) return [{ id: 55, clerk_user_id: "seller_user", address: "123 Oak Street", counterparty_email: "sales+neg42@counterproai.com", alias_email: "sales+neg55@counterproai.com", autonomous_mode: false }];
       if (negId === 77) return [{ id: 77, clerk_user_id: "other_user", address: "123 Oak Street", counterparty_email: "outsider@example.com", alias_email: "sales+neg77@counterproai.com", autonomous_mode: false }];
+      return [];
+    }
+    if (q.includes("UPDATE negotiations") && q.includes("status = 'closed'")) {
+      const negId = values[0];
+      if (negId === 42) negotiationState.neg42Status = "closed";
+      if (negId === 99) {
+        negotiationState.neg99Status = "closed";
+        negotiationState.neg99AutonomousMode = false;
+      }
       return [];
     }
     if (q.includes("SELECT id, alias_email, counterparty_email FROM negotiations")) {
@@ -84,6 +98,11 @@ vi.mock("@/lib/gmail", () => ({
   sendGmail: mockSendGmail,
 }));
 
+vi.mock("@/lib/notify", () => ({
+  getClerkUser: vi.fn().mockResolvedValue({ email: "owner@example.com", firstName: "Owner" }),
+  sendNegotiationResultEmail: mockSendNegotiationResultEmail,
+}));
+
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
@@ -99,9 +118,13 @@ vi.mock("@anthropic-ai/sdk", () => ({
 beforeEach(() => {
   savedMessages.length = 0;
   mockSendGmail.mockClear();
+  mockSendNegotiationResultEmail.mockClear();
   sqlState.history_id = "100";
   fetchOverride.handler = null;
   negotiationState.neg42CounterpartyEmail = "buyer@example.com";
+  negotiationState.neg42Status = "active";
+  negotiationState.neg99Status = "active";
+  negotiationState.neg99AutonomousMode = true;
 
   process.env.GMAIL_SYSTEM_USER_ID = "system_user_123";
   process.env.GMAIL_WEBHOOK_SECRET = "";
@@ -264,6 +287,32 @@ describe("Gmail webhook — inbound message processing", () => {
     // Email notifications removed - just verify messages are saved
     expect(savedMessages.find(m => m.direction === "inbound")).toBeDefined();
     expect(savedMessages.find(m => m.direction === "outbound")).toBeDefined();
+  });
+
+  it("stops autopilot and emails the user when agreement is reached", async () => {
+    historyState.messageIds = ["msg-agreement"];
+    fetchOverride.handler = (url) =>
+      url.includes("/messages/msg-agreement")
+        ? new Response(JSON.stringify(buildFakeGmailMessage("msg-agreement", {
+            to: "sales+neg99@counterproai.com",
+            from: "seller@example.com",
+            body: "I'll accept $122,000. We have a deal. Please have your representative reach out.",
+          })), { status: 200 })
+        : null;
+
+    const { processNewMessages } = await import("@/app/api/webhooks/gmail/route");
+    await processNewMessages("200");
+
+    expect(mockSendGmail).toHaveBeenCalled();
+    expect(mockSendNegotiationResultEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "owner@example.com",
+        negotiationId: 99,
+        agreedPrice: 122000,
+      })
+    );
+    expect(negotiationState.neg99Status).toBe("closed");
+    expect(negotiationState.neg99AutonomousMode).toBe(false);
   });
 
   it("rejects non-alias internal emails from counterproai.com", async () => {
