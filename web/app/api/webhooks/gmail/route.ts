@@ -163,7 +163,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   const [savedMsg] = await sql`
     INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft, gmail_thread_id, gmail_message_id)
     VALUES (${negotiationId}, 'inbound', ${body}, ${draft}, ${gmailThreadId}, ${gmailMessageId})
-    ON CONFLICT (gmail_message_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING id
   `;
 
