@@ -15,6 +15,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const [neg] = await sql`SELECT * FROM negotiations WHERE id = ${id} AND clerk_user_id = ${userId}`;
   if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Check if negotiation is archived and redirect to archive view
+  if (neg.archived_at) {
+    return NextResponse.json({ 
+      error: "Negotiation is archived", 
+      archived: true,
+      archiveUrl: `/archive/negotiations/${id}`
+    }, { status: 301 }); // Use 301 to indicate redirect
+  }
+
   const messages = await sql`
     SELECT * FROM negotiation_messages
     WHERE negotiation_id = ${id}

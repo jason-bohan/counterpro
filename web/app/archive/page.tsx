@@ -183,6 +183,11 @@ export default function ArchivePage() {
                             >
                               {working === `restore-neg-${n.id}` ? "Restoring..." : "Restore"}
                             </Button>
+                            <Link href={`/archive/negotiations/${n.id}`}>
+                              <Button size="sm" variant="ghost" disabled={isWorking}>
+                                View
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="ghost"

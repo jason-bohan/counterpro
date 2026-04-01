@@ -201,6 +201,14 @@ export default function NegotiateThreadPage() {
     fetch(`/api/negotiate-suite/threads/${id}`)
       .then(r => {
         if (r.status === 403) { setAccessDenied(true); return null; }
+        if (r.status === 301) { // Archived negotiation
+          return r.json().then(data => {
+            if (data.archiveUrl) {
+              window.location.href = data.archiveUrl;
+            }
+            return null;
+          });
+        }
         return r.json();
       })
       .then(d => {
