@@ -146,6 +146,31 @@ function getLatestPendingInboundDraft(messages: Message[]): Message | null {
     .find((m) => m.direction === "inbound" && Boolean(m.ai_draft) && !m.approved) ?? null;
 }
 
+function getMessageProvenanceBadge(message: Message): { label: string; className: string } | null {
+  if (message.direction === "proactive" || message.direction === "outbound") {
+    if (message.ai_draft == null) {
+      return {
+        label: "AI Reply",
+        className: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+      };
+    }
+
+    if (message.ai_draft !== message.content) {
+      return {
+        label: "AI Refined",
+        className: "bg-sky-500/20 text-sky-300 border border-sky-500/30",
+      };
+    }
+
+    return {
+      label: "Manual",
+      className: "bg-zinc-500/15 text-zinc-300 border border-zinc-500/25",
+    };
+  }
+
+  return null;
+}
+
 export default function NegotiateThreadPage() {
   const { id } = useParams();
   const { user } = useUser();
@@ -933,6 +958,7 @@ export default function NegotiateThreadPage() {
               )}
 
               {messages.filter(m => m.content !== "[First contact]").map(m => {
+                const provenanceBadge = getMessageProvenanceBadge(m);
                 const messageDocuments = documents.filter(doc =>
                   doc.message_id != null
                     ? doc.message_id === m.id
@@ -957,8 +983,10 @@ export default function NegotiateThreadPage() {
                           {" · "}
                           {relativeTime(m.created_at)}
                         </span>
-                        {(m.direction === "outbound" || (m.direction === "proactive" && m.ai_draft && m.ai_draft !== m.content)) && (
-                          <Badge variant="secondary" className="text-xs h-4 shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30">AI</Badge>
+                        {provenanceBadge && (
+                          <Badge variant="secondary" className={`text-xs h-4 shrink-0 ${provenanceBadge.className}`}>
+                            {provenanceBadge.label}
+                          </Badge>
                         )}
                         {(m.direction === "outbound" || m.direction === "proactive") && m.sent_at && (
                           <Badge variant="secondary" className="text-xs h-4 shrink-0">Sent</Badge>
