@@ -25,22 +25,11 @@ async function getSystemAccessToken(): Promise<string | null> {
 export async function processNewMessages(historyId: string): Promise<void> {
   await setupDatabase();
 
-  // Atomically advance the stored historyId only if the incoming one is newer.
-  // If another concurrent request already processed this historyId, the UPDATE
-  // matches no rows and we skip — preventing duplicate message processing.
   const [stateRow] = await sql`SELECT history_id FROM gmail_state WHERE id = 1`;
   const startHistoryId = stateRow?.history_id ?? historyId;
 
-  const [advanced] = await sql`
-    INSERT INTO gmail_state (id, history_id, updated_at)
-    VALUES (1, ${historyId}, NOW())
-    ON CONFLICT (id) DO UPDATE
-      SET history_id = ${historyId}, updated_at = NOW()
-      WHERE gmail_state.history_id < ${historyId}
-    RETURNING history_id
-  `;
-
-  if (!advanced) {
+  // Skip notifications we've already fully processed.
+  if (stateRow?.history_id && BigInt(historyId) <= BigInt(stateRow.history_id)) {
     await wlog("history", `historyId=${historyId} already processed — skip`);
     return;
   }
@@ -79,13 +68,30 @@ export async function processNewMessages(historyId: string): Promise<void> {
 
   await wlog("history", `historyId=${historyId} found ${messageIds.size} new message(s)`);
 
+  const failedMessageIds: string[] = [];
   for (const msgId of messageIds) {
     try {
       await processSingleMessage(msgId, accessToken);
     } catch (err) {
+      failedMessageIds.push(msgId);
       console.error(`[gmail-webhook] error processing message ${msgId}:`, err);
+      await wlog("message_process", `msgId=${msgId}`, "error", String(err));
     }
   }
+
+  if (failedMessageIds.length > 0) {
+    throw new Error(`Failed to process Gmail message(s): ${failedMessageIds.join(", ")}`);
+  }
+
+  // Advance the stored historyId only after all messages for this notification
+  // have been processed successfully. This keeps Gmail retries recoverable.
+  await sql`
+    INSERT INTO gmail_state (id, history_id, updated_at)
+    VALUES (1, ${historyId}, NOW())
+    ON CONFLICT (id) DO UPDATE
+      SET history_id = ${historyId}, updated_at = NOW()
+      WHERE gmail_state.history_id IS NULL OR gmail_state.history_id < ${historyId}
+  `;
 }
 
 async function processSingleMessage(msgId: string, accessToken: string): Promise<void> {
@@ -283,10 +289,12 @@ export async function POST(req: NextRequest) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // Process asynchronously so we return 200 immediately
-  processNewMessages(historyId).catch(err => {
+  try {
+    await processNewMessages(historyId);
+  } catch (err) {
+    await wlog("process", `historyId=${historyId}`, "error", String(err));
     console.error("[gmail-webhook] processNewMessages error:", err);
-  });
+  }
 
   return new NextResponse(null, { status: 200 });
 }
