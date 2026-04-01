@@ -51,6 +51,75 @@ type Negotiation = {
   gmail_token?: string | null;
 };
 
+function getQuoteDepth(line: string): number {
+  const match = line.match(/^\s*((?:>\s*)+)/);
+  if (!match) return 0;
+  return (match[1].match(/>/g) ?? []).length;
+}
+
+function isQuoteHeader(line: string): boolean {
+  const normalized = line.replace(/^\s*(?:>\s*)+/, "").trim();
+  return /^On .+ wrote:$/i.test(normalized);
+}
+
+function normalizeInboundEmailForDisplay(text: string): string {
+  const lines = text.split("\n");
+  const contentLines = lines.filter(line => line.trim().length > 0);
+
+  if (contentLines.length === 0) return text;
+
+  const meaningfulLines = contentLines.filter(line => !isQuoteHeader(line));
+  const shouldStripOneLevel =
+    meaningfulLines.length > 0 && meaningfulLines.every(line => getQuoteDepth(line) > 0);
+
+  if (!shouldStripOneLevel) return text;
+
+  return lines
+    .map(line => line.replace(/^(\s*)>\s?/, "$1"))
+    .join("\n");
+}
+
+function renderInboundEmail(text: string): React.ReactNode {
+  const normalized = normalizeInboundEmailForDisplay(text);
+  const lines = normalized.split("\n");
+
+  return (
+    <div className="space-y-1.5 leading-relaxed">
+      {lines.map((line, index) => {
+        const depth = getQuoteDepth(line);
+        const content = line.replace(/^\s*(?:>\s*)+/, "").trimEnd();
+
+        if (content.length === 0) {
+          return <div key={index} className="h-2" />;
+        }
+
+        if (depth === 0) {
+          return (
+            <p
+              key={index}
+              className={isQuoteHeader(line) ? "text-xs font-medium text-muted-foreground" : "whitespace-pre-wrap"}
+            >
+              {content}
+            </p>
+          );
+        }
+
+        return (
+          <div
+            key={index}
+            className="border-l-2 border-muted-foreground/20 pl-3 text-muted-foreground"
+            style={{ marginLeft: `${Math.min(depth - 1, 3) * 12}px` }}
+          >
+            <p className={isQuoteHeader(line) ? "text-xs font-medium" : "whitespace-pre-wrap"}>
+              {content}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function relativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -670,7 +739,11 @@ export default function NegotiateThreadPage() {
                           </>
                         )}
                       </div>
-                      <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                      {m.direction === "inbound" ? (
+                        renderInboundEmail(m.content)
+                      ) : (
+                        <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                      )}
                       {messageDocuments.length > 0 && (
                         <div className="mt-3 pt-2 border-t border-current border-opacity-20 flex flex-wrap gap-2">
                           {messageDocuments.map(doc => {

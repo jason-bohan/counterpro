@@ -468,9 +468,14 @@ export default function AdminPage() {
                       {data.webhookLogs.map(l => (
                         <div key={l.id} className={`flex gap-3 py-1.5 border-b last:border-0 ${l.status === "error" ? "text-destructive" : l.status === "skip" ? "text-muted-foreground" : ""}`}>
                           <span className="shrink-0 text-muted-foreground">{new Date(l.created_at).toLocaleTimeString()}</span>
-                          <span className={`shrink-0 w-20 font-medium ${l.status === "error" ? "text-red-600" : l.status === "skip" ? "text-yellow-600" : "text-green-600"}`}>{l.event_type}</span>
-                          <span className="truncate">{l.detail}</span>
-                          {l.error && <span className="shrink-0 text-destructive truncate max-w-xs">{l.error}</span>}
+                          <span
+                            title={l.event_type}
+                            className={`shrink-0 w-24 truncate font-medium ${l.status === "error" ? "text-red-600" : l.status === "skip" ? "text-yellow-600" : "text-green-600"}`}
+                          >
+                            {l.event_type}
+                          </span>
+                          <span title={l.detail ?? ""} className="min-w-0 flex-1 truncate">{l.detail}</span>
+                          {l.error && <span title={l.error} className="shrink-0 text-destructive truncate max-w-xs">{l.error}</span>}
                         </div>
                       ))}
                     </div>
