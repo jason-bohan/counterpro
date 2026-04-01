@@ -1225,7 +1225,7 @@ export default function NegotiateThreadPage() {
                       <p className="text-sm text-muted-foreground">
                         {refinedDraft
                           ? "Review and send, or go back to edit your original."
-                          : "Use this for a manual outbound note. For replies to the latest inbound message, use Generate AI reply."}
+                          : "Use this for a manual outbound note, or generate a reply to the latest inbound message from here."}
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -1370,6 +1370,20 @@ export default function NegotiateThreadPage() {
                             )}
                           </div>
                           <div className="flex gap-3">
+                            {latestInboundAwaitingReply && (
+                              <Button
+                                onClick={generateReplyFromLatestInbound}
+                                disabled={generatingReply || proactiveDrafting || quickSending}
+                                variant="outline"
+                              >
+                                {generatingReply ? (
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    Generating...
+                                  </span>
+                                ) : "Reply to last message"}
+                              </Button>
+                            )}
                             <Button
                               onClick={submitProactive}
                               disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
