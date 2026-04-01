@@ -16,18 +16,12 @@ const {
   sqlState,
   historyState,
   mockSendGmail,
-  mockSendDraftReadyEmail,
-  mockSendAutonomousUpdateEmail,
-  mockGetClerkUser,
   fetchOverride,
 } = vi.hoisted(() => ({
   savedMessages: [] as Array<Record<string, unknown>>,
   sqlState: { history_id: "100" },
   historyState: { messageIds: [] as string[] },
   mockSendGmail: vi.fn().mockResolvedValue(true),
-  mockSendDraftReadyEmail: vi.fn().mockResolvedValue(undefined),
-  mockSendAutonomousUpdateEmail: vi.fn().mockResolvedValue(undefined),
-  mockGetClerkUser: vi.fn().mockResolvedValue({ email: "owner@example.com", firstName: "Jane" }),
   fetchOverride: { handler: null as ((url: string) => Response | null) | null },
 }));
 
@@ -78,12 +72,6 @@ vi.mock("@/lib/gmail", () => ({
   sendGmail: mockSendGmail,
 }));
 
-vi.mock("@/lib/notify", () => ({
-  sendDraftReadyEmail: mockSendDraftReadyEmail,
-  sendAutonomousUpdateEmail: mockSendAutonomousUpdateEmail,
-  getClerkUser: mockGetClerkUser,
-}));
-
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
@@ -98,10 +86,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
 
 beforeEach(() => {
   savedMessages.length = 0;
-  mockSendDraftReadyEmail.mockClear();
-  mockSendAutonomousUpdateEmail.mockClear();
   mockSendGmail.mockClear();
-  mockGetClerkUser.mockClear();
   sqlState.history_id = "100";
   fetchOverride.handler = null;
 
@@ -236,23 +221,19 @@ describe("Gmail webhook — inbound message processing", () => {
     expect(msg.ai_draft).toBe("Thank you for your offer. We propose $310,000.");
   });
 
-  it("notifies owner via email when not in autonomous mode", async () => {
+  it("creates draft without email notification when not in autonomous mode", async () => {
     historyState.messageIds = ["msg-notify"];
     const { processNewMessages } = await import("@/app/api/webhooks/gmail/route");
     await processNewMessages("200");
 
-    expect(mockSendDraftReadyEmail).toHaveBeenCalledWith(
-      "owner@example.com",
-      "123 Oak Street",
-      42,
-      expect.stringContaining("Thank you"),
-      "Jane",
-      "buyer@example.com"
-    );
-    expect(mockSendAutonomousUpdateEmail).not.toHaveBeenCalled();
+    const msg = savedMessages[0];
+    expect(msg.direction).toBe("inbound");
+    expect(msg.negotiation_id).toBe(42);
+    expect(msg.content).toBe("I am interested. Could you lower the price?");
+    expect(msg.ai_draft).toBe("Thank you for your offer. We propose $310,000.");
   });
 
-  it("auto-sends draft and saves outbound message in autonomous mode", async () => {
+  it("auto-sends draft without email notification in autonomous mode", async () => {
     historyState.messageIds = ["msg-auto"];
     fetchOverride.handler = (url) =>
       url.includes("/messages/msg-auto")
@@ -267,9 +248,7 @@ describe("Gmail webhook — inbound message processing", () => {
     await processNewMessages("200");
 
     expect(mockSendGmail).toHaveBeenCalled();
-    expect(mockSendAutonomousUpdateEmail).toHaveBeenCalled();
-    expect(mockSendDraftReadyEmail).not.toHaveBeenCalled();
-
+    // Email notifications removed - just verify messages are saved
     expect(savedMessages.find(m => m.direction === "inbound")).toBeDefined();
     expect(savedMessages.find(m => m.direction === "outbound")).toBeDefined();
   });

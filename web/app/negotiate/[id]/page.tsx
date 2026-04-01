@@ -74,50 +74,31 @@ function normalizeInboundEmailForDisplay(text: string): string {
 
   if (!shouldStripOneLevel) return text;
 
-  return lines
-    .map(line => line.replace(/^(\s*)>\s?/, "$1"))
-    .join("\n");
+    return lines
+      .map(line => line.replace(/^(\s*)>\s?/, "$1"))
+      .join("\n");
+}
+
+function extractVisibleInboundReply(text: string): string {
+  const normalized = normalizeInboundEmailForDisplay(text);
+  const lines = normalized.split("\n");
+  const visible: string[] = [];
+
+  for (const line of lines) {
+    if (isQuoteHeader(line) || getQuoteDepth(line) > 0) {
+      if (visible.some(entry => entry.trim().length > 0)) break;
+      continue;
+    }
+
+    visible.push(line);
+  }
+
+  const cleaned = visible.join("\n").trim();
+  return cleaned || normalized;
 }
 
 function renderInboundEmail(text: string): React.ReactNode {
-  const normalized = normalizeInboundEmailForDisplay(text);
-  const lines = normalized.split("\n");
-
-  return (
-    <div className="space-y-1.5 leading-relaxed">
-      {lines.map((line, index) => {
-        const depth = getQuoteDepth(line);
-        const content = line.replace(/^\s*(?:>\s*)+/, "").trimEnd();
-
-        if (content.length === 0) {
-          return <div key={index} className="h-2" />;
-        }
-
-        if (depth === 0) {
-          return (
-            <p
-              key={index}
-              className={isQuoteHeader(line) ? "text-xs font-medium text-muted-foreground" : "whitespace-pre-wrap"}
-            >
-              {content}
-            </p>
-          );
-        }
-
-        return (
-          <div
-            key={index}
-            className="border-l-2 border-muted-foreground/20 pl-3 text-muted-foreground"
-            style={{ marginLeft: `${Math.min(depth - 1, 3) * 12}px` }}
-          >
-            <p className={isQuoteHeader(line) ? "text-xs font-medium" : "whitespace-pre-wrap"}>
-              {content}
-            </p>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <p className="whitespace-pre-wrap leading-relaxed">{extractVisibleInboundReply(text)}</p>;
 }
 
 function relativeTime(dateStr: string): string {

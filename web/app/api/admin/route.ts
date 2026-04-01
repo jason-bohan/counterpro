@@ -1,7 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { getClerkUserEmail } from "@/lib/notify";
 
 async function isAdmin() {
   const user = await currentUser();
@@ -59,18 +58,8 @@ export async function GET() {
 
   const gmailState = gmailStateRows[0] ?? null;
 
-  // Batch fetch emails from Clerk for all unique users across all sections
-  const allUserIds = new Set([
-    ...(recentPlans as Array<{ clerk_user_id: string }>).map(p => p.clerk_user_id),
-    ...(gmailTokenRows as Array<{ clerk_user_id: string }>).map(t => t.clerk_user_id),
-  ]);
+  // Email lookup removed - Resend functionality disabled
   const userEmails: Record<string, string> = {};
-  await Promise.all(
-    [...allUserIds].map(async (id) => {
-      const email = await getClerkUserEmail(id);
-      if (email) userEmails[id] = email;
-    })
-  );
 
   return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailState, gmailTokens: gmailTokenRows, webhookLogs, userEmails });
 }

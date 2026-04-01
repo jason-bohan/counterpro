@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase } from "@/lib/db";
 import { getAccessToken, sendGmail } from "@/lib/gmail";
-import { sendDraftReadyEmail, sendAutonomousUpdateEmail, getClerkUser } from "@/lib/notify";
 import { stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import Anthropic from "@anthropic-ai/sdk";
-import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
+import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT } from "@/lib/email-pipeline";
 import { put } from "@vercel/blob";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 import { buildDocumentBlobPath } from "@/lib/utils";
@@ -226,10 +225,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
           VALUES (${negotiationId}, 'outbound', ${plainText}, true, NOW())
         `;
         await wlog("autonomous_sent", `neg=${negotiationId} to=${neg.counterparty_email}`);
-        const user = await getClerkUser(neg.clerk_user_id);
-        if (user) {
-          await sendAutonomousUpdateEmail(user.email, neg.address, negotiationId, plainText, user.firstName, neg.counterparty_email);
-        }
+        // Email notifications removed - Resend functionality disabled
         return;
       } else {
         await wlog("autonomous_send_failed", `neg=${negotiationId}`, "error");
@@ -239,15 +235,8 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     }
   }
 
-  // Notify user to review draft
-  const user = await getClerkUser(neg.clerk_user_id);
-  if (user) {
-    await sendDraftReadyEmail(user.email, neg.address, negotiationId, draft, user.firstName, fromHeader);
-    await wlog("draft_ready", `neg=${negotiationId} notified=${user.email}`);
-  } else {
-    await wlog("notify", `neg=${negotiationId} user=${neg.clerk_user_id} — could not find email`, "error");
-    console.error(`[gmail-webhook] Could not find email for user ${neg.clerk_user_id}`);
-  }
+  // Email notifications removed - Resend functionality disabled
+  await wlog("draft_ready", `neg=${negotiationId} draft created - notifications disabled`);
 }
 
 export async function POST(req: NextRequest) {

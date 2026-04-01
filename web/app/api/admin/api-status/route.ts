@@ -110,24 +110,6 @@ function checkBlob(): ApiCheck {
   };
 }
 
-function checkResend(): ApiCheck {
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromAddress = process.env.RESEND_FROM_ADDRESS;
-  if (!apiKey) {
-    return {
-      name: "Resend (Notification Email)",
-      status: "error",
-      detail: "RESEND_API_KEY not set",
-      hint: "Owner notification emails (draft ready, autonomous update) won't send",
-    };
-  }
-  return {
-    name: "Resend (Notification Email)",
-    status: "ok",
-    detail: `Key set (${apiKey.slice(0, 8)}…) · from: ${fromAddress ?? "notifications@counterproai.com (default)"}`,
-  };
-}
-
 function checkGmail(): ApiCheck {
   const systemUserId = process.env.GMAIL_SYSTEM_USER_ID;
   const salesAddress = process.env.GMAIL_SALES_ADDRESS;
@@ -188,7 +170,6 @@ export async function GET() {
     anthropic,
     stripe,
     checkClerk(),
-    checkResend(),
     checkGmail(),
     checkBlob(),
     checkEnvKey("Rentcast (Property Data)", "RENTCAST_API_KEY", { warnIfMissing: true }),
