@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+// Use undici's own File class — the global File may differ across Node.js versions
+// and won't pass undici's internal webidl.is.File() check in older releases.
+import { File as UndiciFile } from "undici";
 
 // Hoisted so they're accessible inside vi.mock factories
 const { sqlUpdates, mockGetAccessToken, mockSendGmail, mockBlobPut, selectOverride } = vi.hoisted(() => {
@@ -105,8 +108,8 @@ function makeRequest(body: object) {
 function makeFormRequest(fields: Record<string, string>, file?: { name: string; type: string; content: string }) {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
-  // Use Blob + explicit filename — more compatible than new File() across Node.js/undici versions
-  if (file) form.append("attachment", new Blob([file.content], { type: file.type }), file.name);
+  // Use undici's own File class — ensures webidl.is.File() passes in all Node.js/undici versions
+  if (file) form.append("attachment", new UndiciFile([file.content], file.name, { type: file.type }));
   return new NextRequest("http://localhost/api/negotiate-suite", { method: "PUT", body: form });
 }
 
