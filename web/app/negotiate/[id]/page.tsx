@@ -419,7 +419,7 @@ export default function NegotiateThreadPage() {
 
   const latestInboundAwaitingReply = [...messages]
     .reverse()
-    .find(m => m.direction === "inbound" && !m.approved);
+    .find(m => m.direction === "inbound");
 
   const regeneratePendingReply = async () => {
     if (!pendingDraft || !id) return;
@@ -1175,9 +1175,9 @@ export default function NegotiateThreadPage() {
                     <Button variant="outline" onClick={() => setShowInbound(true)}>
                       + Add their message
                     </Button>
-                    {latestInboundAwaitingReply && !latestInboundAwaitingReply.ai_draft && (
+                    {latestInboundAwaitingReply && (
                       <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
-                        {generatingReply ? "Generating..." : "Generate AI reply"}
+                        {generatingReply ? "Generating..." : "Reply with AI"}
                       </Button>
                     )}
                     <Button variant="outline" onClick={() => setShowProactive(true)}>
@@ -1381,7 +1381,7 @@ export default function NegotiateThreadPage() {
                                     <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                     Generating...
                                   </span>
-                                ) : "Reply to last message"}
+                                ) : "Reply with AI"}
                               </Button>
                             )}
                             <Button

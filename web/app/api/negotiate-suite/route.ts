@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
       WHERE nm.id = ${replyToMessageId}
         AND nm.negotiation_id = ${negotiationId}
         AND nm.direction = 'inbound'
-        AND nm.approved = false
         AND n.clerk_user_id = ${userId}
     `;
     if (!target) return NextResponse.json({ error: "Reply target not found" }, { status: 404 });
@@ -57,15 +56,28 @@ export async function POST(req: NextRequest) {
 
     const draft = message.content[0].type === "text" ? message.content[0].text : "";
 
-    await sql`
-      UPDATE negotiation_messages
-      SET ai_draft = ${draft}
-      WHERE id = ${replyToMessageId}
-    `;
+    // If the inbound message is already approved (reply was sent), create a new pending
+    // proactive draft rather than overwriting the old approved message's ai_draft.
+    let returnMessageId: number;
+    if (target.approved) {
+      const [newMsg] = await sql`
+        INSERT INTO negotiation_messages (negotiation_id, direction, content, ai_draft, approved)
+        VALUES (${negotiationId}, 'proactive', ${draft}, ${draft}, false)
+        RETURNING id
+      `;
+      returnMessageId = newMsg.id;
+    } else {
+      await sql`
+        UPDATE negotiation_messages
+        SET ai_draft = ${draft}
+        WHERE id = ${replyToMessageId}
+      `;
+      returnMessageId = replyToMessageId;
+    }
 
     await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
 
-    return NextResponse.json({ draft, messageId: replyToMessageId });
+    return NextResponse.json({ draft, messageId: returnMessageId });
   }
 
   // Fetch negotiation + message history
