@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   `;
 
   const documents = await sql`
-    SELECT id, filename, blob_url, mime_type, size_bytes, direction, created_at
+    SELECT id, filename, blob_url, mime_type, size_bytes, direction, message_id, created_at
     FROM negotiation_documents
     WHERE negotiation_id = ${id}
     ORDER BY created_at DESC

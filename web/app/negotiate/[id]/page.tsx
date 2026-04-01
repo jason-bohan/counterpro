@@ -35,6 +35,7 @@ type NegotiationDocument = {
   mime_type: string;
   size_bytes: number | null;
   direction: "sent" | "received";
+  message_id: number | null;
   created_at: string;
 };
 
@@ -86,6 +87,7 @@ export default function NegotiateThreadPage() {
   const [showProactive, setShowProactive] = useState(false);
   const [proactiveMsg, setProactiveMsg] = useState("");
   const [proactiveDrafting, setProactiveDrafting] = useState(false);
+  const [quickSending, setQuickSending] = useState(false);
   const [proactiveAttachment, setProactiveAttachment] = useState<File | null>(null);
 
   // Draft approval
@@ -251,7 +253,7 @@ export default function NegotiateThreadPage() {
 
   const quickSendProactive = async () => {
     if (!proactiveMsg.trim() || !id) return;
-    setProactiveDrafting(true);
+    setQuickSending(true);
     try {
       // For Quick Send, skip AI and use the user's message directly
       const formData = new FormData();
@@ -302,7 +304,7 @@ export default function NegotiateThreadPage() {
       if (fileInput) fileInput.value = '';
       window.dispatchEvent(new Event("notifications-updated"));
     } finally {
-      setProactiveDrafting(false);
+      setQuickSending(false);
       load();
     }
   };
@@ -631,12 +633,12 @@ export default function NegotiateThreadPage() {
               )}
 
               {messages.filter(m => m.content !== "[First contact]").map(m => {
-                const messageDocuments = documents.filter(doc => {
-                  const docTime = new Date(doc.created_at).getTime();
-                  const msgTime = new Date(m.created_at).getTime();
-                  const timeDiff = Math.abs(docTime - msgTime);
-                  return timeDiff < 5000 && doc.direction === (m.direction === "outbound" || m.direction === "proactive" ? "sent" : "received");
-                });
+                const messageDocuments = documents.filter(doc =>
+                  doc.message_id != null
+                    ? doc.message_id === m.id
+                    : Math.abs(new Date(doc.created_at).getTime() - new Date(m.created_at).getTime()) < 5000 &&
+                      doc.direction === (m.direction === "outbound" || m.direction === "proactive" ? "sent" : "received")
+                );
                 return (
                   <div
                     key={m.id}
@@ -676,24 +678,35 @@ export default function NegotiateThreadPage() {
                       </div>
                       <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                       {messageDocuments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-current border-opacity-20">
-                          {messageDocuments.map(doc => (
-                            <a
-                              key={doc.id}
-                              href={doc.blob_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                                m.direction === "outbound" || m.direction === "proactive"
-                                  ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
-                                  : "bg-muted hover:bg-muted/80 text-foreground"
-                              }`}
-                              title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
-                            >
-                              <span className="text-sm">{doc.mime_type === "application/pdf" ? "📄" : "📎"}</span>
-                              <span className="truncate">{doc.filename}</span>
-                            </a>
-                          ))}
+                        <div className="mt-3 pt-2 border-t border-current border-opacity-20 space-y-2">
+                          {messageDocuments.map(doc =>
+                            doc.mime_type.startsWith("image/") ? (
+                              <a key={doc.id} href={doc.blob_url} target="_blank" rel="noopener noreferrer" className="block">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={doc.blob_url}
+                                  alt={doc.filename}
+                                  className="max-w-full rounded-lg max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                key={doc.id}
+                                href={doc.blob_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                                  m.direction === "outbound" || m.direction === "proactive"
+                                    ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
+                                    : "bg-muted hover:bg-muted/80 text-foreground"
+                                }`}
+                                title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
+                              >
+                                <span className="text-sm">{doc.mime_type === "application/pdf" ? "📄" : "📎"}</span>
+                                <span className="truncate max-w-[200px]">{doc.filename}</span>
+                              </a>
+                            )
+                          )}
                         </div>
                       )}
                     </div>
@@ -910,7 +923,7 @@ export default function NegotiateThreadPage() {
                       <div className="flex gap-3">
                         <Button
                           onClick={submitProactive}
-                          disabled={proactiveDrafting || !proactiveMsg.trim()}
+                          disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
                           variant="outline"
                         >
                           {proactiveDrafting ? (
@@ -922,9 +935,9 @@ export default function NegotiateThreadPage() {
                         </Button>
                         <Button
                           onClick={quickSendProactive}
-                          disabled={proactiveDrafting || !proactiveMsg.trim()}
+                          disabled={quickSending || proactiveDrafting || !proactiveMsg.trim()}
                         >
-                          {proactiveDrafting ? (
+                          {quickSending ? (
                             <span className="flex items-center gap-2">
                               <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                               Sending...
@@ -1195,28 +1208,42 @@ export default function NegotiateThreadPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {documents.map(doc => (
-                    <a
-                      key={doc.id}
-                      href={doc.blob_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
-                    >
-                      <span className="text-base shrink-0">
-                        {doc.mime_type === "application/pdf" ? "📄" : "📎"}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
-                          {doc.filename}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
+                  {documents.map(doc =>
+                    doc.mime_type.startsWith("image/") ? (
+                      <a key={doc.id} href={doc.blob_url} target="_blank" rel="noopener noreferrer" className="block group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={doc.blob_url}
+                          alt={doc.filename}
+                          className="w-full rounded-md object-contain max-h-40 hover:opacity-90 transition-opacity"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
                           {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
-                          {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
                         </p>
-                      </div>
-                    </a>
-                  ))}
+                      </a>
+                    ) : (
+                      <a
+                        key={doc.id}
+                        href={doc.blob_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
+                      >
+                        <span className="text-base shrink-0">
+                          {doc.mime_type === "application/pdf" ? "📄" : "📎"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
+                            {doc.filename}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
+                            {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
+                          </p>
+                        </div>
+                      </a>
+                    )
+                  )}
                 </CardContent>
               </Card>
             )}

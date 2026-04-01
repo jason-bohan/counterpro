@@ -7,10 +7,40 @@
 
 export type GmailMessagePart = {
   mimeType: string;
-  body?: { data?: string; size?: number };
+  body?: { data?: string; size?: number; attachmentId?: string };
   parts?: GmailMessagePart[];
   headers?: Array<{ name: string; value: string }>;
 };
+
+export type GmailAttachmentPart = {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+};
+
+/** Walk the MIME tree and return every part that is a file attachment. */
+export function extractAttachments(payload: GmailMessagePart): GmailAttachmentPart[] {
+  const results: GmailAttachmentPart[] = [];
+
+  function walk(part: GmailMessagePart) {
+    const attachmentId = part.body?.attachmentId;
+    if (attachmentId) {
+      // Prefer filename from Content-Disposition, fall back to Content-Type name param
+      const disposition = part.headers?.find(h => h.name.toLowerCase() === "content-disposition")?.value ?? "";
+      const contentType = part.headers?.find(h => h.name.toLowerCase() === "content-type")?.value ?? "";
+      const filename =
+        disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i)?.[1]?.trim() ||
+        contentType.match(/name\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i)?.[1]?.trim() ||
+        `attachment-${attachmentId.slice(0, 8)}`;
+      results.push({ attachmentId, filename, mimeType: part.mimeType, size: part.body?.size ?? 0 });
+    }
+    for (const child of part.parts ?? []) walk(child);
+  }
+
+  walk(payload);
+  return results;
+}
 
 export type ParsedEmail = {
   to: string;

@@ -124,6 +124,8 @@ export async function setupDatabase() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS docs_neg_idx ON negotiation_documents (negotiation_id, created_at DESC)`;
+  await sql`ALTER TABLE negotiation_documents ADD COLUMN IF NOT EXISTS message_id INTEGER REFERENCES negotiation_messages(id) ON DELETE SET NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS docs_msg_idx ON negotiation_documents (message_id) WHERE message_id IS NOT NULL`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS webhook_logs (

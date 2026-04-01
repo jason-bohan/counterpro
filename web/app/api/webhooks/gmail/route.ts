@@ -4,7 +4,8 @@ import { getAccessToken, sendGmail } from "@/lib/gmail";
 import { sendDraftReadyEmail, sendAutonomousUpdateEmail, getClerkUser } from "@/lib/notify";
 import { stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
 import Anthropic from "@anthropic-ai/sdk";
-import { parseEmail, routeInboundEmail, buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
+import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT, type GmailMessagePart } from "@/lib/email-pipeline";
+import { put } from "@vercel/blob";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -160,6 +161,30 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
   `;
 
   await sql`UPDATE negotiations SET updated_at = NOW() WHERE id = ${negotiationId}`;
+
+  // Save any file attachments (images, PDFs, etc.) from the inbound email
+  const attachmentParts = extractAttachments(msgData.payload ?? {});
+  for (const att of attachmentParts) {
+    try {
+      const attRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/attachments/${att.attachmentId}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!attRes.ok) continue;
+      const attData = await attRes.json() as { data?: string };
+      if (!attData.data) continue;
+      const buf = Buffer.from(attData.data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+      const blobPath = `documents/${neg.clerk_user_id}/${negotiationId}/${Date.now()}-${att.filename}`;
+      const { url } = await put(blobPath, buf, { access: "public", contentType: att.mimeType });
+      await sql`
+        INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction, message_id)
+        VALUES (${negotiationId}, ${neg.clerk_user_id}, ${att.filename}, ${url}, ${att.mimeType}, ${buf.length}, 'received', ${savedMsg.id})
+      `;
+      await wlog("attachment_saved", `neg=${negotiationId} file=${att.filename} size=${buf.length}`);
+    } catch (err) {
+      await wlog("attachment_error", `neg=${negotiationId} file=${att.filename}`, "error", String(err));
+    }
+  }
 
   // Autonomous mode: send immediately without user approval
   if (neg.autonomous_mode) {
