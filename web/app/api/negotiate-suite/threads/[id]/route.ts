@@ -44,7 +44,41 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY created_at DESC
   `;
 
-  return NextResponse.json({ negotiation: neg, messages, deadlines, documents });
+  const isCounterProAlias =
+    typeof neg.counterparty_email === "string" &&
+    /^sales\+neg\d+@counterproai\.com$/i.test(neg.counterparty_email);
+
+  let pairedCounterpartyConfirmed = false;
+  let pairedCounterpartyAddress: string | null = null;
+  let pairedCounterpartyRole: string | null = null;
+
+  if (isCounterProAlias && neg.alias_email) {
+    const [pairedCounterparty] = await sql`
+      SELECT alias_email, counterparty_email, address, role
+      FROM negotiations
+      WHERE alias_email = ${neg.counterparty_email.toLowerCase()}
+      LIMIT 1
+    `;
+
+    if (pairedCounterparty) {
+      pairedCounterpartyAddress = pairedCounterparty.address ?? null;
+      pairedCounterpartyRole = pairedCounterparty.role ?? null;
+      pairedCounterpartyConfirmed =
+        String(pairedCounterparty.counterparty_email ?? "").toLowerCase() === String(neg.alias_email).toLowerCase();
+    }
+  }
+
+  return NextResponse.json({
+    negotiation: {
+      ...neg,
+      paired_counterparty_confirmed: pairedCounterpartyConfirmed,
+      paired_counterparty_address: pairedCounterpartyAddress,
+      paired_counterparty_role: pairedCounterpartyRole,
+    },
+    messages,
+    deadlines,
+    documents,
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
