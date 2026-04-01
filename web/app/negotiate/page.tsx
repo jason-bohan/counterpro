@@ -29,9 +29,11 @@ type Thread = {
 };
 
 const SUITE_TOUR_STORAGE_KEY = "counterpro:tour:suite:v1";
+const SUITE_TOUR_DISMISSED_KEY = "counterpro:tour:suite:dismissed";
 const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
 const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
 const SUITE_CHECKLIST_HIDDEN_KEY = "counterpro:onboarding:checklist-hidden";
+const SUITE_CHECKLIST_COMPLETED_KEY = "counterpro:onboarding:checklist-completed";
 
 function relativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -65,9 +67,11 @@ export default function NegotiateSuitePage() {
   const [newAliasEmail, setNewAliasEmail] = useState<string | null>(null);
   const [aliasCopied, setAliasCopied] = useState(false);
   const [tourReady, setTourReady] = useState(false);
+  const [tourDismissed, setTourDismissed] = useState(false);
   const [hasVisitedThread, setHasVisitedThread] = useState(false);
   const [hasCopiedAlias, setHasCopiedAlias] = useState(false);
   const [checklistHidden, setChecklistHidden] = useState(false);
+  const [checklistCompleted, setChecklistCompleted] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,9 +91,11 @@ export default function NegotiateSuitePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setTourDismissed(window.localStorage.getItem(SUITE_TOUR_DISMISSED_KEY) === "true");
     setHasVisitedThread(window.localStorage.getItem(SUITE_THREAD_VISITED_KEY) === "true");
     setHasCopiedAlias(window.localStorage.getItem(SUITE_ALIAS_COPIED_KEY) === "true");
     setChecklistHidden(window.localStorage.getItem(SUITE_CHECKLIST_HIDDEN_KEY) === "true");
+    setChecklistCompleted(window.localStorage.getItem(SUITE_CHECKLIST_COMPLETED_KEY) === "true");
   }, []);
 
   useEffect(() => {
@@ -299,6 +305,16 @@ export default function NegotiateSuitePage() {
     },
   ];
   const completedChecklistCount = checklistItems.filter(item => item.complete).length;
+  const allChecklistComplete = completedChecklistCount === checklistItems.length;
+
+  useEffect(() => {
+    if (!allChecklistComplete || checklistCompleted || typeof window === "undefined") return;
+    window.localStorage.setItem(SUITE_CHECKLIST_COMPLETED_KEY, "true");
+    window.localStorage.setItem(SUITE_CHECKLIST_HIDDEN_KEY, "true");
+    setChecklistCompleted(true);
+    setChecklistHidden(true);
+  }, [allChecklistComplete, checklistCompleted]);
+
   const hideChecklist = () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(SUITE_CHECKLIST_HIDDEN_KEY, "true");
@@ -309,8 +325,17 @@ export default function NegotiateSuitePage() {
   const showChecklist = () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SUITE_CHECKLIST_HIDDEN_KEY);
+      window.localStorage.removeItem(SUITE_CHECKLIST_COMPLETED_KEY);
     }
     setChecklistHidden(false);
+    setChecklistCompleted(false);
+  };
+
+  const dismissTourPrompt = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SUITE_TOUR_DISMISSED_KEY, "true");
+    }
+    setTourDismissed(true);
   };
 
   if (accessDenied) {
@@ -353,7 +378,7 @@ export default function NegotiateSuitePage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h1 className="text-3xl font-bold mb-2">Full Negotiation Suite</h1>
             <div className="flex items-center gap-2">
-              {checklistHidden && (
+              {checklistHidden && !checklistCompleted && (
                 <Button
                   type="button"
                   variant="outline"
@@ -364,16 +389,26 @@ export default function NegotiateSuitePage() {
                   Show setup steps
                 </Button>
               )}
-              {tourReady && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => startSuiteTour(false)}
-                >
-                  Take suite tour
-                </Button>
+              {tourReady && !tourDismissed && (
+                <div className="group flex items-center rounded-md border border-transparent hover:border-border">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => startSuiteTour(false)}
+                  >
+                    Take suite tour
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Dismiss suite tour prompt"
+                    className="mr-1 flex h-7 w-7 items-center justify-center rounded text-muted-foreground opacity-60 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                    onClick={dismissTourPrompt}
+                  >
+                    ×
+                  </button>
+                </div>
               )}
             </div>
           </div>
