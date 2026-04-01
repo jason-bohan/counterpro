@@ -133,6 +133,7 @@ function isOverdue(dueDateStr: string): boolean {
 }
 
 const NEGOTIATION_TOUR_STORAGE_KEY = "counterpro:tour:negotiation:v1";
+const NEGOTIATION_TOUR_DISMISSED_KEY = "counterpro:tour:negotiation:dismissed";
 const SUITE_THREAD_VISITED_KEY = "counterpro:onboarding:thread-visited";
 const SUITE_ALIAS_COPIED_KEY = "counterpro:onboarding:alias-copied";
 
@@ -174,6 +175,7 @@ function getMessageProvenanceBadge(message: Message): { label: string; className
 export default function NegotiateThreadPage() {
   const { id } = useParams();
   const { user } = useUser();
+  const negotiationTourDismissedKey = onboardingStorageKey(NEGOTIATION_TOUR_DISMISSED_KEY, user?.id);
   const threadVisitedKey = onboardingStorageKey(SUITE_THREAD_VISITED_KEY, user?.id);
   const aliasCopiedKey = onboardingStorageKey(SUITE_ALIAS_COPIED_KEY, user?.id);
   const [negotiation, setNegotiation] = useState<Negotiation | null>(null);
@@ -239,6 +241,7 @@ export default function NegotiateThreadPage() {
   const [dlDate, setDlDate] = useState("");
   const [savingDeadline, setSavingDeadline] = useState(false);
   const [tourReady, setTourReady] = useState(false);
+  const [tourDismissed, setTourDismissed] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -474,8 +477,16 @@ export default function NegotiateThreadPage() {
     if (!user?.id) return;
 
     setTourReady(true);
+    setTourDismissed(window.localStorage.getItem(negotiationTourDismissedKey) === "true");
     window.localStorage.setItem(threadVisitedKey, "true");
-  }, [loading, negotiation, threadVisitedKey, user?.id]);
+  }, [loading, negotiation, negotiationTourDismissedKey, threadVisitedKey, user?.id]);
+
+  const dismissTourPrompt = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(negotiationTourDismissedKey, "true");
+    }
+    setTourDismissed(true);
+  };
 
   const submitInbound = async () => {
     if (!newMsg.trim()) return;
@@ -1411,16 +1422,26 @@ export default function NegotiateThreadPage() {
                   <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Deal Info
                   </CardTitle>
-                  {tourReady && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => startTour(false)}
-                    >
-                      Take tour
-                    </Button>
+                  {tourReady && !tourDismissed && (
+                    <div className="group flex items-center rounded-md border border-transparent hover:border-border">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => startTour(false)}
+                      >
+                        Take tour
+                      </Button>
+                      <button
+                        type="button"
+                        aria-label="Dismiss negotiation tour prompt"
+                        className="mr-1 flex h-7 w-7 items-center justify-center rounded text-muted-foreground opacity-60 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                        onClick={dismissTourPrompt}
+                      >
+                        ×
+                      </button>
+                    </div>
                   )}
                 </div>
               </CardHeader>
