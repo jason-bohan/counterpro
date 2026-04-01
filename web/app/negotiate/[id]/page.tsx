@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
 
 type Message = {
@@ -161,6 +162,9 @@ export default function NegotiateThreadPage() {
 
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
+
+  // Archive confirmation
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
 
   // First contact
   const [showFirstContact, setShowFirstContact] = useState(false);
@@ -574,7 +578,7 @@ export default function NegotiateThreadPage() {
             >
               {negotiation.status === "active" ? "Active" : "Closed"}
             </Badge>
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={archiveNegotiation}>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setShowArchiveDialog(true)}>
               Archive
             </Button>
           </div>
@@ -1397,6 +1401,21 @@ export default function NegotiateThreadPage() {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this negotiation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{negotiation?.address}&rdquo; will be moved to your archive. You can still view it there but it won&apos;t appear in your active list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={archiveNegotiation}>Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -40,8 +40,9 @@ function DashboardInner() {
         setDeals(d.deals ?? []);
         const p = d.plan ?? null;
         setPlan(p);
-        // Suite users land on /negotiate — the dashboard is for the single-deal product
-        if (p?.plan === "suite" && !paymentSuccess) {
+        // Suite users land on /negotiate on first login — but can return to dashboard freely
+        if (p?.plan === "suite" && !paymentSuccess && !sessionStorage.getItem("suite_dashboard_visited")) {
+          sessionStorage.setItem("suite_dashboard_visited", "1");
           router.replace("/negotiate");
         }
       })
