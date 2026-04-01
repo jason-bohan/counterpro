@@ -274,6 +274,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
           if (user) {
             const agreedPrice = extractCurrencyAmount(body) ?? extractCurrencyAmount(plainText);
             await sendNegotiationResultEmail({
+              clerkUserId: neg.clerk_user_id,
               to: user.email,
               firstName: user.firstName,
               address: neg.address,
@@ -308,6 +309,7 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     if (user) {
       const agreedPrice = extractCurrencyAmount(body);
       await sendNegotiationResultEmail({
+        clerkUserId: neg.clerk_user_id,
         to: user.email,
         firstName: user.firstName,
         address: neg.address,

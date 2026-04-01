@@ -1,12 +1,10 @@
 import { clerkClient } from "@clerk/nextjs/server";
-import { Resend } from "resend";
+import { getAccessToken, sendGmail } from "@/lib/gmail";
 
 type ClerkUserSummary = {
   email: string;
   firstName: string | null;
 };
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export async function getClerkUser(userId: string): Promise<ClerkUserSummary | null> {
   try {
@@ -31,6 +29,7 @@ export async function getClerkUser(userId: string): Promise<ClerkUserSummary | n
 }
 
 export async function sendNegotiationResultEmail(opts: {
+  clerkUserId: string;
   to: string;
   firstName?: string | null;
   address: string;
@@ -38,14 +37,18 @@ export async function sendNegotiationResultEmail(opts: {
   agreedPrice?: number | null;
   counterpartyLabel?: string | null;
 }): Promise<void> {
-  if (!resend) {
-    console.warn("[notify] RESEND_API_KEY not set; skipping negotiation result email");
+  const sendAsUserId = (await getAccessToken(opts.clerkUserId))
+    ? opts.clerkUserId
+    : process.env.GMAIL_SYSTEM_USER_ID;
+
+  if (!sendAsUserId) {
+    console.warn("[notify] No Gmail sender available; skipping negotiation result email");
     return;
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://counterproai.com";
   const threadUrl = `${appUrl}/negotiate/${opts.negotiationId}`;
-  const from = process.env.RESEND_FROM_ADDRESS ?? "CounterPro <notifications@counterproai.com>";
+  const from = process.env.GMAIL_SALES_ADDRESS ?? "CounterPro <notifications@counterproai.com>";
   const greeting = opts.firstName ? `Hi ${opts.firstName},` : "Hi,";
   const priceLine = opts.agreedPrice
     ? `Agreed price: $${opts.agreedPrice.toLocaleString()}`
@@ -68,10 +71,15 @@ export async function sendNegotiationResultEmail(opts: {
     .filter(Boolean)
     .join("\n");
 
-  await resend.emails.send({
-    from,
-    to: opts.to,
-    subject: `Deal reached: ${opts.address}`,
+  const sent = await sendGmail(
+    sendAsUserId,
+    opts.to,
+    `Deal reached: ${opts.address}`,
     text,
-  });
+    from,
+  );
+
+  if (!sent) {
+    throw new Error("Failed to send negotiation result email via Gmail");
+  }
 }
