@@ -48,6 +48,7 @@ export default function NegotiateSuitePage() {
   const [role, setRole] = useState<string>("buyer");
   const [email, setEmail] = useState("");
   const [creating, setCreating] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newAliasEmail, setNewAliasEmail] = useState<string | null>(null);
   const [aliasCopied, setAliasCopied] = useState(false);
@@ -57,13 +58,15 @@ export default function NegotiateSuitePage() {
     fetch("/api/negotiate-suite/threads")
       .then(r => {
         if (r.status === 403) { setAccessDenied(true); return null; }
+        if (!r.ok) { setLoadError(true); setLoading(false); return null; }
         return r.json();
       })
       .then(d => {
-        if (d) setThreads(d.threads ?? []);
+        if (!d) return;
+        setThreads(d.threads ?? []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   useEffect(() => {
@@ -274,6 +277,14 @@ export default function NegotiateSuitePage() {
         {/* Thread list */}
         {loading ? (
           <div className="text-muted-foreground text-sm py-12 text-center">Loading negotiations...</div>
+        ) : loadError ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-destructive font-medium mb-2">Failed to load negotiations</p>
+              <p className="text-muted-foreground text-sm mb-4">There was a problem connecting to the server. Try refreshing the page.</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>Refresh</Button>
+            </CardContent>
+          </Card>
         ) : threads.length === 0 && !showNew ? (
           <Card>
             <CardContent className="py-16 text-center">
