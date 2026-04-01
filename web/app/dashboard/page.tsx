@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PromoCode } from "@/components/promo-code";
+import { SupportEmail } from "@/components/support-email";
 
 type Deal = {
   id: number;
@@ -298,7 +299,7 @@ function DashboardInner() {
       </main>
 
       <footer className="border-t py-5 px-6 text-center text-xs text-muted-foreground">
-        Questions? <a href="mailto:support@counterproai.com" className="hover:text-foreground underline underline-offset-2">support@counterproai.com</a>
+        Questions? <SupportEmail className="hover:text-foreground underline underline-offset-2" />
       </footer>
     </div>
   );

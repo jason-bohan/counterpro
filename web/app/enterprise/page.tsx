@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SupportEmail } from "@/components/support-email";
 
 export default function EnterprisePage() {
   const [form, setForm] = useState({ name: "", email: "", company: "", agents: "", message: "" });
@@ -163,7 +164,7 @@ export default function EnterprisePage() {
                     <Textarea id="message" rows={3} placeholder="Tell us about your team, use case, or questions..." value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
                   </div>
                   {status === "error" && (
-                    <p className="text-destructive text-sm">Something went wrong. Email us directly at <a href="mailto:support@counterproai.com" className="underline">support@counterproai.com</a></p>
+                    <p className="text-destructive text-sm">Something went wrong. Email us directly at <SupportEmail className="underline" /></p>
                   )}
                   <Button type="submit" className="w-full" size="lg" disabled={status === "loading"}>
                     {status === "loading" ? "Sending..." : "Send inquiry →"}

@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserButton, useUser } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
+import { SupportEmail } from "@/components/support-email";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
 
@@ -336,7 +337,7 @@ export default function DealPage() {
 
                   {error && (
                     <p className="text-destructive text-sm">
-                      {error} If this keeps happening, email <a href="mailto:support@counterproai.com" className="underline">support@counterproai.com</a>
+                      {error} If this keeps happening, email <SupportEmail className="underline" />
                     </p>
                   )}
 

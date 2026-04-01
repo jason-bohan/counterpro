@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
+import { SupportEmail } from "@/components/support-email";
 
 export default function PricingPage() {
   const router = useRouter();
@@ -143,7 +144,7 @@ export default function PricingPage() {
         </div>
       </main>
       <p className="text-xs text-muted-foreground mt-8 text-center">
-        Questions? <a href="mailto:support@counterproai.com" className="underline underline-offset-2 hover:text-foreground">support@counterproai.com</a>
+        Questions? <SupportEmail className="underline underline-offset-2 hover:text-foreground" />
       </p>
     </div>
   );
