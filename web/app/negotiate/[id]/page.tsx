@@ -1180,8 +1180,8 @@ export default function NegotiateThreadPage() {
                         {generatingReply ? "Generating..." : "Reply with AI"}
                       </Button>
                     )}
-                    <Button variant="outline" onClick={() => setShowProactive(true)}>
-                      + Compose new message
+                    <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
+                      {generatingReply ? "Generating..." : "Compose with AI"}
                     </Button>
                   </div>
                 ) : showInbound ? (
