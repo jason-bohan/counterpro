@@ -25,6 +25,7 @@ type Plan = {
   plan: "free" | "single" | "subscription" | "suite";
   deals_remaining: number;
   subscription_end: string | null;
+  stripe_customer_id?: string | null;
 };
 
 function DashboardInner() {
@@ -54,6 +55,7 @@ function DashboardInner() {
   const [archiveTarget, setArchiveTarget] = useState<Deal | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const canManageBilling = Boolean(plan?.stripe_customer_id) && (plan?.plan === "subscription" || plan?.plan === "suite");
 
   const openPortal = async () => {
     setPortalLoading(true);
@@ -95,9 +97,9 @@ function DashboardInner() {
         right={
           <>
             {planLabel()}
-            {(plan?.plan === "subscription" || plan?.plan === "suite" || plan?.plan === "single") && (
+            {canManageBilling && (
               <Button variant="ghost" size="sm" onClick={openPortal} disabled={portalLoading}>
-                {portalLoading ? "Loading..." : plan?.plan === "single" ? "Billing" : "Manage subscription"}
+                {portalLoading ? "Loading..." : "Manage subscription"}
               </Button>
             )}
           </>

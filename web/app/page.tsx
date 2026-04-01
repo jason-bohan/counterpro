@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { Show } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,12 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { NotifyButton } from "@/components/notify-button";
 import { Logo } from "@/components/logo";
+import { getUserPlan } from "@/lib/db";
 import { t, getMessages } from "@/lib/i18n";
 
 const messages = getMessages();
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+  const plan = userId ? await getUserPlan(userId) : null;
   const { landing } = messages;
+  const now = new Date();
+  const hasActiveSubscription = Boolean(plan?.subscription_end ? new Date(plan.subscription_end) > now : false);
+  const hasSuiteAccess = plan?.plan === "suite" && (!plan?.subscription_end || hasActiveSubscription);
+  const hasDealAccess =
+    (plan?.plan === "subscription" && hasActiveSubscription) ||
+    (plan?.plan === "single" && (plan.deals_remaining ?? 0) > 0);
+  const dealCtaHref = hasSuiteAccess ? "/negotiate" : hasDealAccess ? "/deal" : "/sign-up?redirect_url=%2Fdeal";
+  const promoCtaHref = userId ? "/dashboard" : "/sign-up?redirect_url=%2Fdashboard";
+  const suiteCtaHref = hasSuiteAccess ? "/negotiate" : "/sign-up?redirect_url=%2Fpricing";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -32,8 +45,8 @@ export default function LandingPage() {
               </Link>
             </Show>
             <Show when="signed-in">
-              <Link href="/dashboard">
-                <Button size="sm">{t("common.nav.dashboard")}</Button>
+              <Link href={hasSuiteAccess ? "/negotiate" : "/dashboard"}>
+                <Button size="sm">{hasSuiteAccess ? "Open suite" : t("common.nav.dashboard")}</Button>
               </Link>
             </Show>
           </nav>
@@ -54,10 +67,10 @@ export default function LandingPage() {
                 {landing.hero.subheadline}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <Link href="/sign-up?redirect_url=%2Fdeal">
+                <Link href={dealCtaHref}>
                   <Button size="lg" className="px-8 text-base h-12">{landing.hero.cta_single}</Button>
                 </Link>
-                <Link href="/sign-up?redirect_url=%2Fdeal">
+                <Link href={dealCtaHref}>
                   <Button size="lg" variant="outline" className="px-8 text-base h-12">{landing.hero.cta_subscription}</Button>
                 </Link>
               </div>
@@ -164,10 +177,10 @@ export default function LandingPage() {
                       <li key={feature}>✓ {feature}</li>
                     ))}
                   </ul>
-                  <Link href="/sign-up?redirect_url=%2Fdeal" className="block pt-2">
+                  <Link href={dealCtaHref} className="block pt-2">
                     <Button className="w-full">{landing.pricing.single.cta}</Button>
                   </Link>
-                  <Link href="/sign-up?redirect_url=%2Fdashboard" className="block text-center text-xs text-muted-foreground hover:text-foreground transition-colors pt-1">
+                  <Link href={promoCtaHref} className="block text-center text-xs text-muted-foreground hover:text-foreground transition-colors pt-1">
                     Have a promo code? Sign up to redeem →
                   </Link>
                 </CardContent>
@@ -190,7 +203,7 @@ export default function LandingPage() {
                       <li key={feature}>✓ {feature}</li>
                     ))}
                   </ul>
-                  <Link href="/sign-up?redirect_url=%2Fdeal" className="block pt-2">
+                  <Link href={dealCtaHref} className="block pt-2">
                     <Button className="w-full">{landing.pricing.subscription.cta}</Button>
                   </Link>
                 </CardContent>
@@ -233,8 +246,8 @@ export default function LandingPage() {
                     <p className="font-semibold">{landing.pricing.full_suite.title}</p>
                     <p className="text-sm text-muted-foreground mt-1">{landing.pricing.full_suite.desc}</p>
                   </div>
-                  <Link href="/sign-up?redirect_url=%2Fpricing" className="shrink-0">
-                    <Button>Get started →</Button>
+                  <Link href={suiteCtaHref} className="shrink-0">
+                    <Button>{hasSuiteAccess ? "Go to suite →" : "Get started →"}</Button>
                   </Link>
                 </CardContent>
               </Card>
@@ -264,7 +277,7 @@ export default function LandingPage() {
           <div className="max-w-2xl mx-auto">
             <h2 className="text-3xl font-bold mb-4">{landing.cta.heading}</h2>
             <p className="text-muted-foreground mb-8">{landing.cta.subheading}</p>
-            <Link href="/sign-up?redirect_url=%2Fdeal">
+            <Link href={dealCtaHref}>
               <Button size="lg" className="px-10">{landing.cta.button}</Button>
             </Link>
           </div>
