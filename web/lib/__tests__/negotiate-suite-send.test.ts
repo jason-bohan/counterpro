@@ -103,40 +103,49 @@ function makeRequest(body: object) {
 }
 
 /**
- * Build a real multipart/form-data request by hand.
- * This avoids the FormData + NextRequest Content-Type header problem that
- * arises when the test's FormData class (npm undici) differs from the one
- * Node.js core uses internally — causing webidl.is.File() to reject the
- * value or the Content-Type header to be absent.
+ * Build a form request that bypasses Node.js's multipart parser entirely.
+ * The parser internally calls webidl.is.File() which uses instanceof — and
+ * fails when the Node.js core undici version differs from the npm undici version
+ * (two separate class registries). We spy on formData() and return a controlled
+ * fake FormData so the route handler never touches the real parser.
  */
 function makeFormRequest(fields: Record<string, string>, file?: { name: string; type: string; content: string }) {
-  const boundary = "test_boundary_cp";
-  const parts: Buffer[] = [];
-
-  for (const [k, v] of Object.entries(fields)) {
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`
-    ));
-  }
-
-  if (file) {
-    const fileBytes = Buffer.from(file.content, "utf8");
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="attachment"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`
-    ));
-    parts.push(fileBytes);
-    parts.push(Buffer.from("\r\n"));
-  }
-
-  parts.push(Buffer.from(`--${boundary}--\r\n`));
-
-  const body = Buffer.concat(parts);
-
-  return new NextRequest("http://localhost/api/negotiate-suite", {
+  const req = new NextRequest("http://localhost/api/negotiate-suite", {
     method: "PUT",
-    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
-    body,
+    headers: { "Content-Type": "multipart/form-data; boundary=test_boundary_cp" },
+    body: Buffer.from("--test_boundary_cp--\r\n"),
   });
+
+  const fileData = file ? Buffer.from(file.content, "utf8") : null;
+
+  // Fake File-like object — matches what the route handler reads from formData
+  const fakeFile = file && fileData
+    ? {
+        name: file.name,
+        type: file.type,
+        size: fileData.byteLength,
+        arrayBuffer: async () => {
+          const ab = new ArrayBuffer(fileData.byteLength);
+          new Uint8Array(ab).set(fileData);
+          return ab;
+        },
+      }
+    : null;
+
+  const fakeFormData = {
+    get: (key: string) => {
+      if (key === "attachment") return fakeFile;
+      return fields[key] ?? null;
+    },
+    has: (key: string) => {
+      if (key === "attachment") return fakeFile !== null;
+      return key in fields;
+    },
+  } as unknown as FormData;
+
+  vi.spyOn(req, "formData").mockResolvedValueOnce(fakeFormData);
+
+  return req;
 }
 
 describe("negotiate-suite PUT — sent_at", () => {
