@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PromoCode } from "@/components/promo-code";
 
 type Deal = {
@@ -49,6 +50,8 @@ function DashboardInner() {
       .catch(() => {});
   }, [router, paymentSuccess]);
 
+  const [archiveTarget, setArchiveTarget] = useState<Deal | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const openPortal = async () => {
@@ -135,26 +138,65 @@ function DashboardInner() {
             <h2 className="text-lg font-semibold mb-4">Your deals</h2>
             <div className="flex flex-col gap-4">
               {deals.map((deal) => (
-                <Link key={deal.id} href={`/deal/${deal.id}`}>
-                  <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                    <CardContent className="py-4 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{deal.address}</p>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {deal.role} · Asking ${Number(deal.asking_price).toLocaleString()} · Offer ${Number(deal.offer_amount).toLocaleString()} · {new Date(deal.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="secondary" className="capitalize">{deal.role}</Badge>
-                        <span className="text-xs text-muted-foreground">View →</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <div key={deal.id} className="group relative">
+                  <Link href={`/deal/${deal.id}`}>
+                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                      <CardContent className="py-4 flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{deal.address}</p>
+                          <p className="text-sm text-muted-foreground capitalize">
+                            {deal.role} · Asking ${Number(deal.asking_price).toLocaleString()} · Offer ${Number(deal.offer_amount).toLocaleString()} · {new Date(deal.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="secondary" className="capitalize">{deal.role}</Badge>
+                          <span className="text-xs text-muted-foreground group-hover:hidden">View →</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                  <button
+                    className="absolute right-4 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded"
+                    onClick={e => { e.preventDefault(); setArchiveTarget(deal); }}
+                  >
+                    Archive
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         )}
+
+        <AlertDialog open={!!archiveTarget} onOpenChange={open => { if (!open) setArchiveTarget(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Archive this deal?</AlertDialogTitle>
+              <AlertDialogDescription>
+                &ldquo;{archiveTarget?.address}&rdquo; will be moved to your archive. You can still view it there.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={archiving}
+                onClick={async () => {
+                  if (!archiveTarget) return;
+                  setArchiving(true);
+                  await fetch(`/api/deals/${archiveTarget.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ archived: true }),
+                  });
+                  setDeals(prev => prev.filter(d => d.id !== archiveTarget.id));
+                  setArchiveTarget(null);
+                  setArchiving(false);
+                }}
+              >
+                {archiving ? "Archiving…" : "Archive"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Pricing */}
         <div data-section="pricing-cards" className="grid sm:grid-cols-2 gap-4">
@@ -166,13 +208,13 @@ function DashboardInner() {
               </div>
               <p className="text-sm text-muted-foreground">One-time, no subscription required.</p>
             </CardHeader>
-            <CardContent className="flex flex-col flex-1 gap-4">
+            <CardContent className="flex flex-col flex-1 gap-6 pt-2 pb-6">
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Full negotiation strategy</li>
                 <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Email & verbal scripts</li>
                 <li className="flex items-center gap-2"><span className="text-green-500 font-bold">✓</span> Walk-away point analysis</li>
               </ul>
-              <div className="mt-auto space-y-2">
+              <div className="mt-auto space-y-3">
                 <Link href="/pricing">
                   <Button className="w-full" variant="outline">Get package</Button>
                 </Link>
