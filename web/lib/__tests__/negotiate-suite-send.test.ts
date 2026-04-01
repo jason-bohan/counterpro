@@ -105,7 +105,8 @@ function makeRequest(body: object) {
 function makeFormRequest(fields: Record<string, string>, file?: { name: string; type: string; content: string }) {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
-  if (file) form.append("attachment", new File([file.content], file.name, { type: file.type }));
+  // Use Blob + explicit filename — more compatible than new File() across Node.js/undici versions
+  if (file) form.append("attachment", new Blob([file.content], { type: file.type }), file.name);
   return new NextRequest("http://localhost/api/negotiate-suite", { method: "PUT", body: form });
 }
 
