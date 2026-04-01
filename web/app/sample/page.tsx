@@ -192,7 +192,7 @@ export default function SamplePage() {
               <Button size="lg" variant="secondary" className="px-8">Get started — $50</Button>
             </Link>
             <Link href="/sign-up?redirect_url=%2Fdeal">
-              <Button size="lg" variant="outline" className="px-8 border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
+              <Button size="lg" variant="outline" className="px-8 bg-transparent border-primary-foreground/60 text-primary-foreground hover:bg-primary-foreground/15">
                 Unlimited — $100/mo
               </Button>
             </Link>
