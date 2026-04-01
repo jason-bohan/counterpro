@@ -127,6 +127,23 @@ export async function PUT(req: NextRequest) {
         const subject = `Re: Negotiation - ${msg.address}`;
         const fromAddress = msg.alias_email || process.env.GMAIL_SALES_ADDRESS;
         const replyTo = msg.alias_email ?? undefined;
+
+        // For proactive messages (user-initiated), gmail_thread_id is not set on the message
+        // itself — look up the most recent inbound message that has one so the reply stays
+        // in the existing Gmail thread.
+        let gmailThreadId: string | undefined = msg.gmail_thread_id ?? undefined;
+        let gmailMessageId: string | undefined = msg.gmail_message_id ?? undefined;
+        if (!gmailThreadId) {
+          const [threadSource] = await sql`
+            SELECT gmail_thread_id, gmail_message_id FROM negotiation_messages
+            WHERE negotiation_id = ${msg.negotiation_id} AND direction = 'inbound'
+              AND gmail_thread_id IS NOT NULL
+            ORDER BY created_at DESC LIMIT 1
+          `;
+          gmailThreadId = threadSource?.gmail_thread_id ?? undefined;
+          gmailMessageId = threadSource?.gmail_message_id ?? undefined;
+        }
+
         sent = await sendGmailLib(
           sendAsUserId,
           msg.counterparty_email,
@@ -135,8 +152,8 @@ export async function PUT(req: NextRequest) {
           fromAddress ?? undefined,
           replyTo,
           undefined,
-          msg.gmail_thread_id ?? undefined,
-          msg.gmail_message_id ?? undefined,
+          gmailThreadId,
+          gmailMessageId,
           attachment ? [attachment] : undefined,
         );
       } catch {

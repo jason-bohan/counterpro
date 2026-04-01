@@ -10,6 +10,7 @@ import {
   buildNegotiationPrompt,
   buildProactivePrompt,
   stripMarkdown,
+  extractAttachments,
   type GmailMessagePart,
 } from "../email-pipeline";
 
@@ -397,5 +398,128 @@ describe("buildProactivePrompt", () => {
     expect(prompt).toContain("[COUNTERPARTY]: Is the property still available?");
     expect(prompt).toContain("[YOU]: Yes, it is. Are you interested in viewing?");
     expect(prompt).toContain("schedule a viewing for Saturday afternoon");
+  });
+});
+
+// ── extractAttachments ─────────────────────────────────────────────────────
+
+function attachmentPart(opts: {
+  attachmentId: string;
+  mimeType: string;
+  size?: number;
+  contentDisposition?: string;
+  contentType?: string;
+}): GmailMessagePart {
+  return {
+    mimeType: opts.mimeType,
+    body: { attachmentId: opts.attachmentId, size: opts.size ?? 1024 },
+    headers: [
+      ...(opts.contentDisposition ? [{ name: "Content-Disposition", value: opts.contentDisposition }] : []),
+      ...(opts.contentType ? [{ name: "Content-Type", value: opts.contentType }] : []),
+    ],
+  };
+}
+
+describe("extractAttachments", () => {
+  it("returns empty array when there are no attachments", () => {
+    const payload: GmailMessagePart = {
+      mimeType: "multipart/alternative",
+      parts: [
+        { mimeType: "text/plain", body: { data: b64url("Hello") } },
+        { mimeType: "text/html", body: { data: b64url("<p>Hello</p>") } },
+      ],
+    };
+    expect(extractAttachments(payload)).toEqual([]);
+  });
+
+  it("extracts a single PDF attachment with Content-Disposition filename", () => {
+    const payload: GmailMessagePart = {
+      mimeType: "multipart/mixed",
+      parts: [
+        { mimeType: "text/plain", body: { data: b64url("See attached.") } },
+        attachmentPart({
+          attachmentId: "att-abc123",
+          mimeType: "application/pdf",
+          size: 80000,
+          contentDisposition: 'attachment; filename="contract.pdf"',
+          contentType: "application/pdf",
+        }),
+      ],
+    };
+    const result = extractAttachments(payload);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      attachmentId: "att-abc123",
+      filename: "contract.pdf",
+      mimeType: "application/pdf",
+      size: 80000,
+    });
+  });
+
+  it("falls back to Content-Type name param when Content-Disposition is absent", () => {
+    const payload = attachmentPart({
+      attachmentId: "att-xyz",
+      mimeType: "image/jpeg",
+      contentType: 'image/jpeg; name="photo.jpg"',
+    });
+    const [att] = extractAttachments(payload);
+    expect(att.filename).toBe("photo.jpg");
+  });
+
+  it("falls back to attachment-{id} when no filename header exists", () => {
+    const payload = attachmentPart({ attachmentId: "abc12345xyz", mimeType: "application/octet-stream" });
+    const [att] = extractAttachments(payload);
+    expect(att.filename).toBe("attachment-abc12345");
+  });
+
+  it("extracts multiple attachments from a multipart payload", () => {
+    const payload: GmailMessagePart = {
+      mimeType: "multipart/mixed",
+      parts: [
+        { mimeType: "text/plain", body: { data: b64url("See attached files.") } },
+        attachmentPart({ attachmentId: "att-1", mimeType: "image/png", contentDisposition: 'attachment; filename="photo.png"' }),
+        attachmentPart({ attachmentId: "att-2", mimeType: "application/pdf", contentDisposition: 'attachment; filename="report.pdf"' }),
+      ],
+    };
+    const result = extractAttachments(payload);
+    expect(result).toHaveLength(2);
+    expect(result.map(a => a.filename)).toEqual(["photo.png", "report.pdf"]);
+  });
+
+  it("finds attachments nested inside multipart/related", () => {
+    const payload: GmailMessagePart = {
+      mimeType: "multipart/mixed",
+      parts: [
+        {
+          mimeType: "multipart/related",
+          parts: [
+            { mimeType: "text/html", body: { data: b64url("<p>hi</p>") } },
+            attachmentPart({ attachmentId: "inline-img", mimeType: "image/gif", contentDisposition: 'inline; filename="logo.gif"' }),
+          ],
+        },
+      ],
+    };
+    const result = extractAttachments(payload);
+    expect(result).toHaveLength(1);
+    expect(result[0].attachmentId).toBe("inline-img");
+    expect(result[0].filename).toBe("logo.gif");
+  });
+
+  it("ignores parts that have body.data but no attachmentId", () => {
+    const payload: GmailMessagePart = {
+      mimeType: "text/plain",
+      body: { data: b64url("just text") },
+    };
+    expect(extractAttachments(payload)).toEqual([]);
+  });
+
+  it("reports the correct size from body.size", () => {
+    const payload = attachmentPart({
+      attachmentId: "sized-att",
+      mimeType: "application/zip",
+      size: 512000,
+      contentDisposition: 'attachment; filename="archive.zip"',
+    });
+    expect(extractAttachments(payload)[0].size).toBe(512000);
   });
 });

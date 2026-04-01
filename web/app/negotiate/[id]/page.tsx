@@ -89,6 +89,8 @@ export default function NegotiateThreadPage() {
   const [proactiveDrafting, setProactiveDrafting] = useState(false);
   const [quickSending, setQuickSending] = useState(false);
   const [proactiveAttachment, setProactiveAttachment] = useState<File | null>(null);
+  // After AI refinement, hold the result here for in-panel approve/dismiss
+  const [refinedDraft, setRefinedDraft] = useState<{ text: string; messageId: number; original: string } | null>(null);
 
   // Draft approval
   const [pendingDraft, setPendingDraft] = useState<{ draft: string; messageId: number } | null>(null);
@@ -236,18 +238,10 @@ export default function NegotiateThreadPage() {
       });
       if (res.status === 403) { setAccessDenied(true); return; }
       const { draft, messageId } = await res.json();
-      setPendingDraft({ draft, messageId });
-      setEditedDraft(draft);
-      setAttachedFile(proactiveAttachment); // Transfer attachment to Gmail sending state
-      setProactiveMsg("");
-      setProactiveAttachment(null);
-      setShowProactive(false);
-      // Clear file input
-      const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
+      // Show the refined draft inside the compose panel for approve/dismiss
+      setRefinedDraft({ text: draft, messageId, original: proactiveMsg });
     } finally {
       setProactiveDrafting(false);
-      load();
     }
   };
 
@@ -678,35 +672,28 @@ export default function NegotiateThreadPage() {
                       </div>
                       <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                       {messageDocuments.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-current border-opacity-20 space-y-2">
-                          {messageDocuments.map(doc =>
-                            doc.mime_type.startsWith("image/") ? (
-                              <a key={doc.id} href={doc.blob_url} target="_blank" rel="noopener noreferrer" className="block">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={doc.blob_url}
-                                  alt={doc.filename}
-                                  className="max-w-full rounded-lg max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                                />
-                              </a>
-                            ) : (
+                        <div className="mt-3 pt-2 border-t border-current border-opacity-20 flex flex-wrap gap-2">
+                          {messageDocuments.map(doc => {
+                            const icon = doc.mime_type === "application/pdf" ? "📄" : doc.mime_type.startsWith("image/") ? "🖼️" : "📎";
+                            const isOutbound = m.direction === "outbound" || m.direction === "proactive";
+                            return (
                               <a
                                 key={doc.id}
                                 href={doc.blob_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                                  m.direction === "outbound" || m.direction === "proactive"
+                                  isOutbound
                                     ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
                                     : "bg-muted hover:bg-muted/80 text-foreground"
                                 }`}
                                 title={`${doc.filename}${doc.size_bytes ? ` (${Math.round(doc.size_bytes / 1024)}KB)` : ""}`}
                               >
-                                <span className="text-sm">{doc.mime_type === "application/pdf" ? "📄" : "📎"}</span>
+                                <span className="text-sm">{icon}</span>
                                 <span className="truncate max-w-[200px]">{doc.filename}</span>
                               </a>
-                            )
-                          )}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -861,99 +848,183 @@ export default function NegotiateThreadPage() {
                 ) : (
                   <Card>
                     <CardHeader className="pb-2 pt-4">
-                      <CardTitle className="text-base">Compose a new message</CardTitle>
-                      <p className="text-sm text-muted-foreground">AI will refine your message for review.</p>
+                      <CardTitle className="text-base">
+                        {refinedDraft ? "AI refined your message" : "Compose a new message"}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {refinedDraft ? "Review and send, or go back to edit your original." : "AI will refine your message for review."}
+                      </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <Textarea
-                        rows={5}
-                        placeholder="Type your message here... (e.g. 'I want to offer $350k' or 'Can we schedule a viewing?')"
-                        value={proactiveMsg}
-                        onChange={e => setProactiveMsg(e.target.value)}
-                        autoFocus
-                      />
-                      
-                      {/* File attachment */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="file"
-                            id="proactive-file"
-                            className="hidden"
-                            onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (file) setProactiveAttachment(file);
-                            }}
+                      {refinedDraft ? (
+                        <>
+                          <Textarea
+                            rows={9}
+                            value={refinedDraft.text}
+                            onChange={e => setRefinedDraft(r => r ? { ...r, text: e.target.value } : r)}
+                            className="text-sm font-mono resize-y"
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => document.getElementById('proactive-file')?.click()}
-                            className="text-xs"
-                          >
-                            📎 Attach document
-                          </Button>
-                          {proactiveAttachment && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>📄 {proactiveAttachment.name}</span>
+                          <div className="flex gap-3 flex-wrap">
+                            <Button
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              disabled={quickSending}
+                              onClick={async () => {
+                                if (!refinedDraft) return;
+                                setQuickSending(true);
+                                try {
+                                  let sendBody: BodyInit;
+                                  let sendHeaders: Record<string, string> | undefined;
+                                  if (proactiveAttachment) {
+                                    const f = new FormData();
+                                    f.append("messageId", String(refinedDraft.messageId));
+                                    f.append("approved", "true");
+                                    f.append("editedDraft", refinedDraft.text);
+                                    f.append("attachment", proactiveAttachment);
+                                    sendBody = f;
+                                  } else {
+                                    sendBody = JSON.stringify({ messageId: refinedDraft.messageId, approved: true, editedDraft: refinedDraft.text });
+                                    sendHeaders = { "Content-Type": "application/json" };
+                                  }
+                                  await fetch("/api/negotiate-suite", { method: "PUT", headers: sendHeaders, body: sendBody });
+                                  setRefinedDraft(null);
+                                  setProactiveMsg("");
+                                  setProactiveAttachment(null);
+                                  setShowProactive(false);
+                                  window.dispatchEvent(new Event("notifications-updated"));
+                                  load();
+                                } finally {
+                                  setQuickSending(false);
+                                }
+                              }}
+                            >
+                              {quickSending ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  Sending...
+                                </span>
+                              ) : "Send →"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                // Restore original message so user can edit
+                                setProactiveMsg(refinedDraft.original);
+                                setRefinedDraft(null);
+                              }}
+                            >
+                              ← Edit original
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              onClick={async () => {
+                                const msgId = refinedDraft.messageId;
+                                setRefinedDraft(null);
+                                setProactiveMsg("");
+                                setProactiveAttachment(null);
+                                setShowProactive(false);
+                                await fetch("/api/negotiate-suite", {
+                                  method: "PUT",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ messageId: msgId, discard: true }),
+                                });
+                                load();
+                              }}
+                            >
+                              Discard
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Textarea
+                            rows={5}
+                            placeholder="Type your message here... (e.g. 'I want to offer $350k' or 'Can we schedule a viewing?')"
+                            value={proactiveMsg}
+                            onChange={e => setProactiveMsg(e.target.value)}
+                            autoFocus
+                          />
+                          {/* File attachment */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="file"
+                                id="proactive-file"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (file) setProactiveAttachment(file);
+                                }}
+                              />
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setProactiveAttachment(null);
-                                  const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
-                                  if (fileInput) fileInput.value = '';
-                                }}
-                                className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => document.getElementById('proactive-file')?.click()}
+                                className="text-xs"
                               >
-                                ×
+                                📎 Attach document
                               </Button>
+                              {proactiveAttachment && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>📄 {proactiveAttachment.name}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setProactiveAttachment(null);
+                                      const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+                                      if (fileInput) fileInput.value = '';
+                                    }}
+                                    className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                                  >
+                                    ×
+                                  </Button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        {proactiveAttachment && (
-                          <p className="text-xs text-muted-foreground">
-                            Document will be attached to the Gmail thread when sent
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={submitProactive}
-                          disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
-                          variant="outline"
-                        >
-                          {proactiveDrafting ? (
-                            <span className="flex items-center gap-2">
-                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              AI is refining...
-                            </span>
-                          ) : "Refine with AI →"}
-                        </Button>
-                        <Button
-                          onClick={quickSendProactive}
-                          disabled={quickSending || proactiveDrafting || !proactiveMsg.trim()}
-                        >
-                          {quickSending ? (
-                            <span className="flex items-center gap-2">
-                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              Sending...
-                            </span>
-                          ) : "Quick Send"}
-                        </Button>
-                        <Button variant="ghost" onClick={() => { 
-                          setShowProactive(false); 
-                          setProactiveMsg(""); 
-                          setProactiveAttachment(null);
-                          const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
-                          if (fileInput) fileInput.value = '';
-                        }}>
-                          Cancel
-                        </Button>
-                      </div>
+                            {proactiveAttachment && (
+                              <p className="text-xs text-muted-foreground">
+                                Document will be attached to the Gmail thread when sent
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={submitProactive}
+                              disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
+                              variant="outline"
+                            >
+                              {proactiveDrafting ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  AI is refining...
+                                </span>
+                              ) : "Refine with AI →"}
+                            </Button>
+                            <Button
+                              onClick={quickSendProactive}
+                              disabled={quickSending || proactiveDrafting || !proactiveMsg.trim()}
+                            >
+                              {quickSending ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  Sending...
+                                </span>
+                              ) : "Quick Send"}
+                            </Button>
+                            <Button variant="ghost" onClick={() => {
+                              setShowProactive(false);
+                              setProactiveMsg("");
+                              setProactiveAttachment(null);
+                              const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
+                              if (fileInput) fileInput.value = '';
+                            }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -1208,20 +1279,9 @@ export default function NegotiateThreadPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {documents.map(doc =>
-                    doc.mime_type.startsWith("image/") ? (
-                      <a key={doc.id} href={doc.blob_url} target="_blank" rel="noopener noreferrer" className="block group">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={doc.blob_url}
-                          alt={doc.filename}
-                          className="w-full rounded-md object-contain max-h-40 hover:opacity-90 transition-opacity"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
-                        </p>
-                      </a>
-                    ) : (
+                  {documents.map(doc => {
+                    const icon = doc.mime_type === "application/pdf" ? "📄" : doc.mime_type.startsWith("image/") ? "🖼️" : "📎";
+                    return (
                       <a
                         key={doc.id}
                         href={doc.blob_url}
@@ -1229,9 +1289,7 @@ export default function NegotiateThreadPage() {
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
                       >
-                        <span className="text-base shrink-0">
-                          {doc.mime_type === "application/pdf" ? "📄" : "📎"}
-                        </span>
+                        <span className="text-base shrink-0">{icon}</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
                             {doc.filename}
@@ -1242,8 +1300,8 @@ export default function NegotiateThreadPage() {
                           </p>
                         </div>
                       </a>
-                    )
-                  )}
+                    );
+                  })}
                 </CardContent>
               </Card>
             )}

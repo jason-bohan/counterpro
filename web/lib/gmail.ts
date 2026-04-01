@@ -87,6 +87,76 @@ export type GmailAttachment = {
   data: Buffer;
 };
 
+/** Pure function — builds the RFC 2822 raw email string ready for base64url encoding. */
+export function buildRawEmail(opts: {
+  to: string;
+  subject: string;
+  body: string;
+  from?: string;
+  replyTo?: string;
+  html?: string;
+  inReplyTo?: string;
+  attachments?: GmailAttachment[];
+}): string {
+  const { to, subject, body, from, replyTo, html, inReplyTo, attachments } = opts;
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
+
+  const headers: string[] = [];
+  if (from) headers.push(`From: ${from}`);
+  headers.push(`To: ${to}`);
+  if (replyTo) headers.push(`Reply-To: ${replyTo}`);
+  if (inReplyTo) {
+    headers.push(`In-Reply-To: ${inReplyTo}`);
+    headers.push(`References: ${inReplyTo}`);
+  }
+  headers.push(`Subject: ${encodedSubject}`, `MIME-Version: 1.0`);
+
+  const hasAttachments = attachments && attachments.length > 0;
+
+  // Content-Type must live in the headers section (before the blank-line separator),
+  // not in the body — email clients won't parse attachments otherwise.
+  let bodySection: string;
+  if (hasAttachments) {
+    const boundary = "boundary_mixed_cp";
+    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    const textPart = [
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      `Content-Transfer-Encoding: 7bit`,
+      ``,
+      body,
+    ].join("\r\n");
+    const attachParts = attachments!.map(att => [
+      `--${boundary}`,
+      `Content-Type: ${att.mimeType}; name="${att.name}"`,
+      `Content-Transfer-Encoding: base64`,
+      `Content-Disposition: attachment; filename="${att.name}"`,
+      ``,
+      att.data.toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? att.data.toString("base64"),
+    ].join("\r\n")).join("\r\n");
+    bodySection = [textPart, attachParts, `--${boundary}--`].join("\r\n");
+  } else if (html) {
+    const boundary = "boundary_alt_cp";
+    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+    bodySection = [
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      ``,
+      body,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=utf-8`,
+      ``,
+      html,
+      `--${boundary}--`,
+    ].join("\r\n");
+  } else {
+    headers.push(`Content-Type: text/plain; charset=utf-8`);
+    bodySection = body;
+  }
+
+  return [...headers, "", bodySection].join("\r\n");
+}
+
 export async function sendGmail(
   userId: string,
   to: string,
@@ -116,66 +186,10 @@ export async function sendGmail(
     }
   }
 
-  // Encode subject for non-ASCII characters (RFC 2047)
-  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
-
-  const headers: string[] = [];
-  if (from) headers.push(`From: ${from}`);
-  headers.push(`To: ${to}`);
-  if (replyTo) headers.push(`Reply-To: ${replyTo}`);
-  if (inReplyTo) {
-    headers.push(`In-Reply-To: ${inReplyTo}`);
-    headers.push(`References: ${inReplyTo}`);
-  }
-  headers.push(`Subject: ${encodedSubject}`, `MIME-Version: 1.0`);
-
-  const hasAttachments = attachments && attachments.length > 0;
-
-  // Content-Type must live in the headers section (before the blank-line separator),
-  // not in the body — email clients won't parse attachments otherwise.
-  let bodySection: string;
-  if (hasAttachments) {
-    const boundary = "boundary_mixed_cp";
-    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-
-    const textPart = [
-      `--${boundary}`,
-      `Content-Type: text/plain; charset=utf-8`,
-      `Content-Transfer-Encoding: 7bit`,
-      ``,
-      body,
-    ].join("\r\n");
-
-    const attachParts = attachments!.map(att => [
-      `--${boundary}`,
-      `Content-Type: ${att.mimeType}; name="${att.name}"`,
-      `Content-Transfer-Encoding: base64`,
-      `Content-Disposition: attachment; filename="${att.name}"`,
-      ``,
-      att.data.toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? att.data.toString("base64"),
-    ].join("\r\n")).join("\r\n");
-
-    bodySection = [textPart, attachParts, `--${boundary}--`].join("\r\n");
-  } else if (html) {
-    const boundary = "boundary_alt_cp";
-    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-    bodySection = [
-      `--${boundary}`,
-      `Content-Type: text/plain; charset=utf-8`,
-      ``,
-      body,
-      `--${boundary}`,
-      `Content-Type: text/html; charset=utf-8`,
-      ``,
-      html,
-      `--${boundary}--`,
-    ].join("\r\n");
-  } else {
-    headers.push(`Content-Type: text/plain; charset=utf-8`);
-    bodySection = body;
-  }
-
-  const raw = Buffer.from([...headers, "", bodySection].join("\r\n"), "utf8").toString("base64url");
+  const raw = Buffer.from(
+    buildRawEmail({ to, subject, body, from, replyTo, html, inReplyTo, attachments }),
+    "utf8"
+  ).toString("base64url");
 
   const sendPayload: Record<string, string> = { raw };
   if (threadId) sendPayload.threadId = threadId;
