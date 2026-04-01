@@ -630,7 +630,7 @@ export default function NegotiateSuitePage() {
             <h2 className="text-lg font-semibold mb-4">Active negotiations</h2>
             <div className="flex flex-col gap-3">
               {threads.map(t => (
-                <div key={t.id} className="group relative">
+                <div key={t.id} className="group">
                   <Link href={`/negotiate/${t.id}`}>
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardContent className="py-4 flex items-center justify-between gap-4">
@@ -668,16 +668,18 @@ export default function NegotiateSuitePage() {
                             )}
                           </p>
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0 group-hover:hidden">Open →</span>
+                        <div className="shrink-0">
+                          <span className="text-xs text-muted-foreground group-hover:hidden">Open →</span>
+                          <button
+                            className="hidden group-hover:block text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+                            onClick={e => { e.preventDefault(); setArchiveTarget(t); }}
+                          >
+                            Archive
+                          </button>
+                        </div>
                       </CardContent>
                     </Card>
                   </Link>
-                  <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded"
-                    onClick={e => { e.preventDefault(); setArchiveTarget(t); }}
-                  >
-                    Archive
-                  </button>
                 </div>
               ))}
             </div>

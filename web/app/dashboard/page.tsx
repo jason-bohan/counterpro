@@ -141,7 +141,7 @@ function DashboardInner() {
             <h2 className="text-lg font-semibold mb-4">Your deals</h2>
             <div className="flex flex-col gap-4">
               {deals.map((deal) => (
-                <div key={deal.id} className="group relative">
+                <div key={deal.id} className="group">
                   <Link href={`/deal/${deal.id}`}>
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardContent className="py-4 flex items-center justify-between">
@@ -154,16 +154,16 @@ function DashboardInner() {
                         <div className="flex items-center gap-2 shrink-0">
                           <Badge variant="secondary" className="capitalize">{deal.role}</Badge>
                           <span className="text-xs text-muted-foreground group-hover:hidden">View →</span>
+                          <button
+                            className="hidden group-hover:block text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+                            onClick={e => { e.preventDefault(); setArchiveTarget(deal); }}
+                          >
+                            Archive
+                          </button>
                         </div>
                       </CardContent>
                     </Card>
                   </Link>
-                  <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded"
-                    onClick={e => { e.preventDefault(); setArchiveTarget(deal); }}
-                  >
-                    Archive
-                  </button>
                 </div>
               ))}
             </div>
