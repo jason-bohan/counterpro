@@ -188,6 +188,7 @@ export default function NegotiateThreadPage() {
   const [showFirstContact, setShowFirstContact] = useState(false);
   const [researching, setResearching] = useState(false);
   const [research, setResearch] = useState<{ market_value_low: number; market_value_high: number; suggested_offer: number; reasoning: string } | null>(null);
+  const [researchError, setResearchError] = useState<string>("");
   const [offerAmount, setOfferAmount] = useState("");
   const [offerNotes, setOfferNotes] = useState("");
   const [generatingFirst, setGeneratingFirst] = useState(false);
@@ -593,11 +594,35 @@ export default function NegotiateThreadPage() {
 
   const runMarketResearch = async () => {
     setResearching(true);
+    setResearchError("");
     try {
       const res = await fetch(`/api/negotiate-suite/threads/${id}/research`);
       const data = await res.json();
+      if (!res.ok) {
+        setResearch(null);
+        setOfferAmount("");
+        setResearchError(typeof data?.error === "string" ? data.error : "Could not estimate market value right now.");
+        return;
+      }
+
+      const hasEstimate =
+        typeof data?.market_value_low === "number" &&
+        typeof data?.market_value_high === "number" &&
+        typeof data?.suggested_offer === "number";
+
+      if (!hasEstimate) {
+        setResearch(null);
+        setOfferAmount("");
+        setResearchError("Research came back incomplete. You can still enter an offer manually.");
+        return;
+      }
+
       setResearch(data);
-      setOfferAmount(String(data.suggested_offer ?? ""));
+      setOfferAmount(String(data.suggested_offer));
+    } catch {
+      setResearch(null);
+      setOfferAmount("");
+      setResearchError("Could not estimate market value right now.");
     } finally {
       setResearching(false);
     }
@@ -772,6 +797,12 @@ export default function NegotiateThreadPage() {
                         Researching market value for {negotiation.address}...
                       </div>
                     )}
+                    {researchError && !researching && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Market research unavailable</p>
+                        <p className="text-sm text-amber-900">{researchError}</p>
+                      </div>
+                    )}
                     {research && !researching && (
                       <div className="rounded-lg bg-muted/60 px-4 py-3 space-y-1">
                         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">AI Market Estimate</p>
@@ -827,7 +858,7 @@ export default function NegotiateThreadPage() {
                           </span>
                         ) : "Draft opening message →"}
                       </Button>
-                      <Button variant="ghost" onClick={() => { setShowFirstContact(false); setResearch(null); setOfferAmount(""); setOfferNotes(""); }}>
+                      <Button variant="ghost" onClick={() => { setShowFirstContact(false); setResearch(null); setResearchError(""); setOfferAmount(""); setOfferNotes(""); }}>
                         Cancel
                       </Button>
                     </div>
