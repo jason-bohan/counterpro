@@ -14,6 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Settings2 } from "lucide-react";
+import { AI_TONE_OPTIONS } from "@/lib/email-pipeline";
 
 type Message = {
   id: number;
@@ -52,6 +55,7 @@ type Negotiation = {
   status: string;
   created_at: string;
   autonomous_mode: boolean;
+  ai_tone: string;
   gmail_token?: string | null;
   paired_counterparty_confirmed?: boolean;
   paired_counterparty_address?: string | null;
@@ -232,8 +236,16 @@ export default function NegotiateThreadPage() {
   const [researchError, setResearchError] = useState<string>("");
   const [offerAmount, setOfferAmount] = useState("");
   const [offerNotes, setOfferNotes] = useState("");
+  const [offerTone, setOfferTone] = useState("professional");
+  const [offerCustomTone, setOfferCustomTone] = useState("");
   const [generatingFirst, setGeneratingFirst] = useState(false);
   const [generatingReply, setGeneratingReply] = useState(false);
+
+  // AI Settings
+  const [showAiSettings, setShowAiSettings] = useState(false);
+  const [aiTone, setAiTone] = useState("professional");
+  const [aiCustomTone, setAiCustomTone] = useState("");
+  const [savingAiTone, setSavingAiTone] = useState(false);
 
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
@@ -268,6 +280,14 @@ export default function NegotiateThreadPage() {
         const nextCounterpartyEmail = d.negotiation?.counterparty_email ?? "";
         setEmailValue(isCounterProAliasEmail(nextCounterpartyEmail) ? "" : nextCounterpartyEmail);
         setPairingAliasValue(isCounterProAliasEmail(nextCounterpartyEmail) ? nextCounterpartyEmail : "");
+        const savedTone = d.negotiation?.ai_tone ?? "professional";
+        const isCustom = !AI_TONE_OPTIONS.some(o => o.value === savedTone || o.value === "custom" && savedTone === "professional");
+        if (isCustom && savedTone !== "professional") {
+          setAiTone("custom");
+          setAiCustomTone(savedTone);
+        } else {
+          setAiTone(savedTone);
+        }
         // Sync pending draft from DB
         const pending = getLatestPendingInboundDraft(d.messages ?? []);
         if (pending) {

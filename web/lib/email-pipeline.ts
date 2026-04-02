@@ -165,13 +165,34 @@ Respond ONLY with this exact JSON format, no other text:
 }`;
 }
 
+export const AI_TONE_OPTIONS = [
+  { value: "professional", label: "Professional" },
+  { value: "firm", label: "Firm & Direct" },
+  { value: "collaborative", label: "Warm & Collaborative" },
+  { value: "urgent", label: "Urgent & Assertive" },
+  { value: "custom", label: "Custom…" },
+] as const;
+
+export type AiToneValue = typeof AI_TONE_OPTIONS[number]["value"];
+
+function toneInstruction(tone: string): string {
+  switch (tone) {
+    case "firm": return "Tone: firm and direct — confident, no hedging, clear expectations.";
+    case "collaborative": return "Tone: warm and collaborative — build rapport, emphasize mutual benefit, avoid adversarial language.";
+    case "urgent": return "Tone: urgent and assertive — create a sense of time pressure, strong language, decisive.";
+    case "professional": return "Tone: professional — polished, neutral, business-like.";
+    default: return tone ? `Tone: ${tone}` : "Tone: professional.";
+  }
+}
+
 export function buildFirstContactPrompt(
   address: string,
   role: "buyer" | "seller" | string,
   offerAmount: number,
   notes?: string,
   aliasEmail?: string | null,
-  pairUrl?: string | null
+  pairUrl?: string | null,
+  tone?: string | null
 ): string {
   const isBuyer = role === "buyer";
   const pairLine = pairUrl
@@ -184,8 +205,9 @@ export function buildFirstContactPrompt(
 
 ${isBuyer ? `Buyer's opening offer: $${offerAmount.toLocaleString()}` : `Seller's asking price: $${offerAmount.toLocaleString()}`}
 ${notes ? `Additional context: ${notes}` : ""}
+${toneInstruction(tone ?? "professional")}
 
-Draft a professional first contact email that:
+Draft a first contact email that:
 - ${isBuyer ? "Expresses genuine, serious interest in the property" : "Presents the property as an attractive opportunity"}
 - States the ${isBuyer ? "offer" : "asking price"} confidently with brief market justification
 - ${isBuyer ? "Shows flexibility on timeline/terms to compensate for the price" : "Highlights the property's strengths and favorable terms"}
@@ -200,7 +222,8 @@ Draft a professional first contact email that:
 export function buildNegotiationPrompt(
   address: string,
   history: Array<{ direction: string; content: string }>,
-  newMessage: string
+  newMessage: string,
+  tone?: string | null
 ): string {
   const historyText = history
     .map(m => `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`)
@@ -214,6 +237,7 @@ ${historyText || "(No prior messages)"}
 New message from counterparty:
 ${newMessage}
 
+${toneInstruction(tone ?? "professional")}
 Draft my response:`;
 }
 

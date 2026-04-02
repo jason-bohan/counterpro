@@ -99,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { status, counterparty_email, deadline_date, autonomous_mode, archived } = body;
+  const { status, counterparty_email, deadline_date, autonomous_mode, archived, ai_tone } = body;
   const normalizedCounterpartyEmail =
     counterparty_email !== undefined
       ? (typeof counterparty_email === "string" && counterparty_email.trim() !== ""
@@ -125,6 +125,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     parsedDeadline = parsed.toISOString();
   }
 
+  const validTones = ["professional", "firm", "collaborative", "urgent", "custom"];
+  const resolvedTone = ai_tone !== undefined && (validTones.includes(ai_tone) || ai_tone?.startsWith?.("custom:"))
+    ? ai_tone : undefined;
+
   const [updated] = await sql`
     UPDATE negotiations
     SET
@@ -132,10 +136,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       counterparty_email = COALESCE(${normalizedCounterpartyEmail ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
+      ai_tone = COALESCE(${resolvedTone ?? null}, ai_tone),
       ${archived !== undefined ? sql`archived_at = ${archived === true ? sql`NOW()` : null}` : sql`archived_at = archived_at`},
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
-    RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, updated_at
+    RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, ai_tone, updated_at
   `;
 
   return NextResponse.json({ ok: true, negotiation: updated });

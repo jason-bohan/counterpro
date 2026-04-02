@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
   const prompt = buildNegotiationPrompt(
     neg.address,
     messages as Array<{ direction: string; content: string }>,
-    newMessage
+    newMessage,
+    neg.ai_tone
   );
 
   const message = await client.messages.create({
