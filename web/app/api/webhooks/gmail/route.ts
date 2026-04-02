@@ -5,12 +5,13 @@ import { stripMarkdown, stripAiPreamble, detectAgreementReached, extractCurrency
 import Anthropic from "@anthropic-ai/sdk";
 import { parseEmail, routeInboundEmail, buildNegotiationPrompt, extractAttachments, SUITE_SYSTEM_PROMPT } from "@/lib/email-pipeline";
 import { put } from "@vercel/blob";
-import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
+import { ALIAS_DOMAIN, CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 import { buildDocumentBlobPath } from "@/lib/utils";
-import { getClerkUser, sendNegotiationResultEmail } from "@/lib/notify";
+import { getClerkUser, sendNegotiationActivityCopyEmail, sendNegotiationResultEmail } from "@/lib/notify";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const TERMINAL_NEGOTIATION_STATUSES = new Set(["closed", "won", "lost"]);
+const COUNTERPRO_ALIAS_SUFFIX = `@${ALIAS_DOMAIN}`;
 
 function isAnthropicCreditError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -27,6 +28,10 @@ async function getSystemAccessToken(): Promise<string | null> {
   const systemUserId = process.env.GMAIL_SYSTEM_USER_ID;
   if (!systemUserId) return null;
   return getAccessToken(systemUserId);
+}
+
+function isCounterProAlias(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.toLowerCase().endsWith(COUNTERPRO_ALIAS_SUFFIX);
 }
 
 export async function processNewMessages(historyId: string): Promise<void> {
@@ -206,6 +211,22 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
     }
   }
 
+  if (routing.sourceNegotiationId !== null && neg.gmail_copy_enabled) {
+    try {
+      await sendNegotiationActivityCopyEmail({
+        clerkUserId: neg.clerk_user_id,
+        negotiationId,
+        address: neg.address,
+        direction: "received",
+        message: body,
+        counterpartyLabel: fromHeader,
+      });
+      await wlog("gmail_copy_sent", `neg=${negotiationId} direction=received`);
+    } catch (err) {
+      await wlog("gmail_copy_failed", `neg=${negotiationId} direction=received`, "error", String(err));
+    }
+  }
+
   if (isTerminal) {
     await sql`UPDATE negotiation_messages SET approved = true WHERE id = ${savedMsg.id}`;
     await wlog("autonomous_terminal_skip", `neg=${negotiationId} already terminal — no reply sent`, "skip");
@@ -285,6 +306,22 @@ async function processSingleMessage(msgId: string, accessToken: string): Promise
           VALUES (${negotiationId}, 'outbound', ${plainText}, true, NOW())
         `;
         await wlog("autonomous_sent", `neg=${negotiationId} to=${neg.counterparty_email}`);
+
+        if (neg.gmail_copy_enabled && isCounterProAlias(neg.counterparty_email)) {
+          try {
+            await sendNegotiationActivityCopyEmail({
+              clerkUserId: neg.clerk_user_id,
+              negotiationId,
+              address: neg.address,
+              direction: "sent",
+              message: plainText,
+              counterpartyLabel: neg.counterparty_email,
+            });
+            await wlog("gmail_copy_sent", `neg=${negotiationId} direction=sent`);
+          } catch (err) {
+            await wlog("gmail_copy_failed", `neg=${negotiationId} direction=sent`, "error", String(err));
+          }
+        }
 
         if (agreementReached) {
           await sql`
