@@ -302,16 +302,18 @@ export function buildProactivePrompt(
 Negotiation history so far:
 ${historyText || "(No prior messages)"}
 
-User wants to send this proactive message:
+User's exact draft message:
 "${userMessage}"
 
 Refine this message into a professional, strategic email that:
+- Preserves the substance, intent, and key facts from the user's exact draft
+- Uses the negotiation history above for context and consistency
 - Maintains the professional tone of the negotiation
 - Is concise and impactful
 - Ends with a clear next step if appropriate
 - Fits naturally into the existing conversation context
 
-Return the refined message as the email body (no subject line needed):`;
+Return only the refined email body (no subject line needed). Do not invent price points, facts, or concessions the user did not state or imply from the history:`;
 }
 
 const AGREEMENT_PATTERNS = [

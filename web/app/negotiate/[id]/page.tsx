@@ -493,10 +493,23 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const discardRefinedDraftMessage = async (messageId: number) => {
+    await fetch("/api/negotiate-suite", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId, discard: true }),
+    });
+  };
+
   const quickSendProactive = async () => {
     if (!proactiveMsg.trim() || !id) return;
     setQuickSending(true);
     try {
+      if (refinedDraft) {
+        await discardRefinedDraftMessage(refinedDraft.messageId);
+        setRefinedDraft(null);
+      }
+
       // For Quick Send, skip AI and use the user's message directly
       const formData = new FormData();
       formData.append("negotiationId", id.toString());
@@ -1305,10 +1318,12 @@ export default function NegotiateThreadPage() {
                             </Button>
                             <Button
                               variant="outline"
-                              onClick={() => {
+                              onClick={async () => {
                                 // Restore original message so user can edit
+                                await discardRefinedDraftMessage(refinedDraft.messageId);
                                 setProactiveMsg(refinedDraft.original);
                                 setRefinedDraft(null);
+                                load();
                               }}
                             >
                               ← Edit original
