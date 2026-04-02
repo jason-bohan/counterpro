@@ -24,7 +24,7 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [neg] = await sql`SELECT address, role FROM negotiations WHERE id = ${negotiationId}`;
+  const [neg] = await sql`SELECT address, role, alias_email, pairing_token FROM negotiations WHERE id = ${negotiationId}`;
 
   const body = await req.json();
   const { offerAmount, notes } = body;
@@ -33,7 +33,10 @@ export async function POST(
     return NextResponse.json({ error: "offerAmount (positive number) is required" }, { status: 400 });
   }
 
-  const prompt = buildFirstContactPrompt(neg.address, neg.role, offerAmount, notes);
+  const pairUrl = neg.pairing_token
+    ? `https://counterproai.com/pair?token=${neg.pairing_token}`
+    : null;
+  const prompt = buildFirstContactPrompt(neg.address, neg.role, offerAmount, notes, neg.alias_email, pairUrl);
 
   const message = await client.messages.create({
     model: CLAUDE_MODEL,

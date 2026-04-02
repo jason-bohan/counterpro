@@ -608,11 +608,18 @@ export default function NegotiateThreadPage() {
         body = JSON.stringify({ messageId: pendingDraft.messageId, approved: true, editedDraft });
         headers = { "Content-Type": "application/json" };
       }
-      await fetch("/api/negotiate-suite", { method: "PUT", headers, body });
+      const res = await fetch("/api/negotiate-suite", { method: "PUT", headers, body });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || `Send failed (${res.status}). Please try again.`);
+        return;
+      }
       setPendingDraft(null);
       setAttachedFile(null);
       window.dispatchEvent(new Event("notifications-updated"));
       load();
+    } catch {
+      alert("Network error — please check your connection and try again.");
     } finally {
       setSending(false);
     }
@@ -1122,7 +1129,7 @@ export default function NegotiateThreadPage() {
                       ref={fileInputRef}
                       type="file"
                       className="hidden"
-                      accept=".pdf,.doc,.docx,.txt"
+                      accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.webp"
                       onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
                     />
                     {attachedFile ? (

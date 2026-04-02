@@ -497,7 +497,8 @@ export default function AdminPage() {
           };
           const filtered = (data?.recentPlans ?? []).filter(p => {
             const matchesPlan = userPlanFilter === "all" || p.plan === userPlanFilter;
-            const matchesSearch = !userSearch || p.clerk_user_id.toLowerCase().includes(userSearch.toLowerCase());
+            const email = data?.userEmails[p.clerk_user_id] ?? "";
+            const matchesSearch = !userSearch || p.clerk_user_id.toLowerCase().includes(userSearch.toLowerCase()) || email.toLowerCase().includes(userSearch.toLowerCase());
             return matchesPlan && matchesSearch;
           });
           return (

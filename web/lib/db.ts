@@ -170,6 +170,15 @@ export async function setupDatabase() {
     SET alias_email = 'sales+neg' || id::text || '@counterproai.com'
     WHERE alias_email IS NULL
   `);
+
+  await m("negotiations.pairing_token", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS pairing_token TEXT`);
+  await m("uq_pairing_token", sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_pairing_token ON negotiations (pairing_token) WHERE pairing_token IS NOT NULL`);
+  // Backfill pairing tokens for existing negotiations
+  await m("backfill_pairing_token", sql`
+    UPDATE negotiations
+    SET pairing_token = encode(gen_random_bytes(18), 'base64url')
+    WHERE pairing_token IS NULL
+  `);
 }
 
 export async function getUserPlan(clerkUserId: string) {

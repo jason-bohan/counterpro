@@ -151,12 +151,21 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const negotiationId = parseInt(id, 10);
   if (isNaN(negotiationId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  // Only allow deleting archived negotiations
+  // Allow deleting if: archived, OR has no sent messages yet
   const [row] = await sql`
     DELETE FROM negotiations
-    WHERE id = ${negotiationId} AND clerk_user_id = ${userId} AND archived_at IS NOT NULL
+    WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
+      AND (
+        archived_at IS NOT NULL
+        OR NOT EXISTS (
+          SELECT 1 FROM negotiation_messages
+          WHERE negotiation_id = ${negotiationId}
+            AND direction IN ('outbound', 'proactive')
+            AND approved = true
+        )
+      )
     RETURNING id
   `;
-  if (!row) return NextResponse.json({ error: "Not found or not archived" }, { status: 404 });
+  if (!row) return NextResponse.json({ error: "Cannot delete — negotiation has sent messages. Archive it instead." }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

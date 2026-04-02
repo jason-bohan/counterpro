@@ -24,6 +24,7 @@ type Thread = {
   alias_email?: string | null;
   autonomous_mode?: boolean;
   updated_at: string;
+  created_at: string;
   last_message: string | null;
   pending_count: number;
 };
@@ -72,6 +73,8 @@ export default function NegotiateSuitePage() {
   const [loadError, setLoadError] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<Thread | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Thread | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newAliasEmail, setNewAliasEmail] = useState<string | null>(null);
   const [aliasCopied, setAliasCopied] = useState(false);
@@ -662,19 +665,26 @@ export default function NegotiateSuitePage() {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            Updated {relativeTime(t.updated_at)}
+                            Started {new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            {" · "}Updated {relativeTime(t.updated_at)}
                             {t.counterparty_email && (
                               <> · <span className="text-muted-foreground">{t.counterparty_email}</span></>
                             )}
                           </p>
                         </div>
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex flex-col items-end gap-1">
                           <span className="text-xs text-muted-foreground group-hover:hidden">Open →</span>
                           <button
-                            className="hidden group-hover:block text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+                            className="hidden group-hover:flex text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
                             onClick={e => { e.preventDefault(); setArchiveTarget(t); }}
                           >
                             Archive
+                          </button>
+                          <button
+                            className="hidden group-hover:flex text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+                            onClick={e => { e.preventDefault(); setDeleteTarget(t); }}
+                          >
+                            Delete
                           </button>
                         </div>
                       </CardContent>
@@ -712,6 +722,39 @@ export default function NegotiateSuitePage() {
                 }}
               >
                 {archiving ? "Archiving…" : "Archive"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this negotiation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                &ldquo;{deleteTarget?.address}&rdquo; will be permanently deleted. This cannot be undone. Only negotiations with no sent messages can be deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleting}
+                className="bg-destructive hover:bg-destructive/90 text-white"
+                onClick={async () => {
+                  if (!deleteTarget) return;
+                  setDeleting(true);
+                  const res = await fetch(`/api/negotiate-suite/threads/${deleteTarget.id}`, { method: "DELETE" });
+                  if (res.ok) {
+                    setThreads(prev => prev.filter(t => t.id !== deleteTarget.id));
+                  } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.error || "Could not delete this negotiation.");
+                  }
+                  setDeleteTarget(null);
+                  setDeleting(false);
+                }}
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

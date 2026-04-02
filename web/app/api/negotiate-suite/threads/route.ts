@@ -54,8 +54,10 @@ export async function POST(req: NextRequest) {
   `;
 
   const aliasEmail = generateAliasEmail(thread.id);
+  const { randomBytes } = await import("crypto");
+  const pairingToken = randomBytes(18).toString("base64url");
   await sql`
-    UPDATE negotiations SET alias_email = ${aliasEmail} WHERE id = ${thread.id}
+    UPDATE negotiations SET alias_email = ${aliasEmail}, pairing_token = ${pairingToken} WHERE id = ${thread.id}
   `;
 
   return NextResponse.json({ id: thread.id, alias_email: aliasEmail });

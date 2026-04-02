@@ -63,17 +63,27 @@ export function AppHeader({ right, nav = [] }: AppHeaderProps) {
     };
   }, [pathname]);
 
-  const navLinks = nav.map(item => (
+  const baseNav: NavItem[] = [
+    { label: "Negotiations", href: "/negotiate" },
+    { label: "Dashboard", href: "/dashboard" },
+  ];
+  // Merge base nav with page-specific extras, deduplicating by href
+  const allNav = [
+    ...baseNav,
+    ...nav.filter(item => !baseNav.some(b => b.href === item.href)),
+  ];
+
+  const navLinks = allNav.map(item => (
     <Link
       key={item.href}
       href={item.href}
-      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+      className={`text-sm transition-colors ${pathname === item.href ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
     >
       {item.label}
     </Link>
   ));
 
-  const mobileNavLinks = nav.map(item => (
+  const mobileNavLinks = allNav.map(item => (
     <Link
       key={item.href}
       href={item.href}
@@ -87,8 +97,8 @@ export function AppHeader({ right, nav = [] }: AppHeaderProps) {
   return (
     <header className="border-b bg-background sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Left: logo */}
-        <Logo size={40} href="/" />
+        {/* Left: logo → home (negotiations) */}
+        <Logo size={40} href="/negotiate" />
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-5 flex-1 px-4">

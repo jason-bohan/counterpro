@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -58,8 +58,19 @@ export async function GET() {
 
   const gmailState = gmailStateRows[0] ?? null;
 
-  // Email lookup removed - Resend functionality disabled
+  // Look up emails for all paid users via Clerk
+  const userIds = (recentPlans as Array<{ clerk_user_id: string }>).map(p => p.clerk_user_id);
   const userEmails: Record<string, string> = {};
+  try {
+    const client = await clerkClient();
+    const users = await client.users.getUserList({ userId: userIds, limit: 500 });
+    for (const u of users.data) {
+      const email = u.emailAddresses?.[0]?.emailAddress;
+      if (email) userEmails[u.id] = email;
+    }
+  } catch {
+    // Non-fatal — admin page still works without emails
+  }
 
   return NextResponse.json({ promoCodes, redemptions, inquiries, waitlist, recentPlans, gmailState, gmailTokens: gmailTokenRows, webhookLogs, userEmails });
 }

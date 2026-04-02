@@ -169,9 +169,17 @@ export function buildFirstContactPrompt(
   address: string,
   role: "buyer" | "seller" | string,
   offerAmount: number,
-  notes?: string
+  notes?: string,
+  aliasEmail?: string | null,
+  pairUrl?: string | null
 ): string {
   const isBuyer = role === "buyer";
+  const pairLine = pairUrl
+    ? `\n\nIf you also use CounterPro, you can sync our negotiations with one click: ${pairUrl}`
+    : "";
+  const footer = aliasEmail
+    ? `\n\nIMPORTANT: After the email body, on a new line add exactly this footer (replace nothing, keep it word for word):\n\n---\nNote: This negotiation is managed through CounterPro. Please reply directly to this email to keep all correspondence in one place. Your reply will be routed to ${aliasEmail} automatically.${pairLine}`
+    : "";
   return `You are CounterPro, helping a real estate ${role} initiate contact about the property at: ${address}
 
 ${isBuyer ? `Buyer's opening offer: $${offerAmount.toLocaleString()}` : `Seller's asking price: $${offerAmount.toLocaleString()}`}
@@ -184,7 +192,7 @@ Draft a professional first contact email that:
 - Creates mild urgency without being aggressive
 - Ends with a clear, specific next step
 - Is concise — 3 to 4 short paragraphs
-- Do NOT include a subject line — just the email body`;
+- Do NOT include a subject line — just the email body${footer}`;
 }
 
 // ── AI prompt builder ──────────────────────────────────────────────────────
