@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AppHeader } from "@/components/app-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2 } from "lucide-react";
-import { AI_TONE_OPTIONS } from "@/lib/email-pipeline";
+import { AI_TONE_OPTIONS, REGIONAL_TONE_OPTIONS, REALTOR_PERSONALITY_OPTIONS } from "@/lib/email-pipeline";
 
 type Message = {
   id: number;
@@ -179,7 +180,6 @@ function getMessageProvenanceBadge(message: Message): { label: string; className
 export default function NegotiateThreadPage() {
   const { id } = useParams();
   const { user } = useUser();
-  const negotiationTourDismissedKey = onboardingStorageKey(NEGOTIATION_TOUR_DISMISSED_KEY, user?.id);
   const threadVisitedKey = onboardingStorageKey(SUITE_THREAD_VISITED_KEY, user?.id);
   const aliasCopiedKey = onboardingStorageKey(SUITE_ALIAS_COPIED_KEY, user?.id);
   const [negotiation, setNegotiation] = useState<Negotiation | null>(null);
@@ -245,6 +245,8 @@ export default function NegotiateThreadPage() {
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [aiTone, setAiTone] = useState("professional");
   const [aiCustomTone, setAiCustomTone] = useState("");
+  const [aiRegionalTone, setAiRegionalTone] = useState("");
+  const [aiRealtorPersonality, setAiRealtorPersonality] = useState("");
   const [savingAiTone, setSavingAiTone] = useState(false);
 
   // Deadline form
@@ -252,8 +254,6 @@ export default function NegotiateThreadPage() {
   const [dlLabel, setDlLabel] = useState("");
   const [dlDate, setDlDate] = useState("");
   const [savingDeadline, setSavingDeadline] = useState(false);
-  const [tourReady, setTourReady] = useState(false);
-  const [tourDismissed, setTourDismissed] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -281,13 +281,25 @@ export default function NegotiateThreadPage() {
         setEmailValue(isCounterProAliasEmail(nextCounterpartyEmail) ? "" : nextCounterpartyEmail);
         setPairingAliasValue(isCounterProAliasEmail(nextCounterpartyEmail) ? nextCounterpartyEmail : "");
         const savedTone = d.negotiation?.ai_tone ?? "professional";
-        const isCustom = !AI_TONE_OPTIONS.some(o => o.value === savedTone || o.value === "custom" && savedTone === "professional");
-        if (isCustom && savedTone !== "professional") {
+        
+        // Parse combined tone format (base_tone|regional_tone|personality_tone)
+        const toneParts = savedTone.split("|");
+        const baseTone = toneParts[0];
+        const regionalTone = toneParts[1] ?? "";
+        const personalityTone = toneParts[2] ?? "";
+        
+        // Determine if base tone is custom
+        const isCustom = !AI_TONE_OPTIONS.some(o => o.value === baseTone || o.value === "custom" && baseTone === "professional");
+        if (isCustom && baseTone !== "professional") {
           setAiTone("custom");
-          setAiCustomTone(savedTone);
+          setAiCustomTone(baseTone);
         } else {
-          setAiTone(savedTone);
+          setAiTone(baseTone);
         }
+        
+        // Set regional and personality tones if present
+        if (regionalTone) setAiRegionalTone(regionalTone);
+        if (personalityTone) setAiRealtorPersonality(personalityTone);
         // Sync pending draft from DB
         const pending = getLatestPendingInboundDraft(d.messages ?? []);
         if (pending) {
@@ -373,69 +385,6 @@ export default function NegotiateThreadPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingDraft]);
-
-  const startTour = useCallback((markSeen = false) => {
-    if (typeof window === "undefined") return;
-
-    const steps = [
-      {
-        element: "[data-tour='alias-email']",
-        popover: {
-          title: "Share this alias",
-          description: "This is the negotiation-specific inbox. Use it for external emails or as the link point for another CounterPro thread.",
-          side: "left" as const,
-          align: "start" as const,
-        },
-      },
-      {
-        element: "[data-tour='pairing']",
-        popover: {
-          title: "Pair CounterPro threads",
-          description: "Paste another CounterPro alias here when both parties are using the app. Once both sides pair each other, bot-to-bot negotiation can start safely.",
-          side: "left" as const,
-          align: "start" as const,
-        },
-      },
-      {
-        element: "[data-tour='autopilot']",
-        popover: {
-          title: "Set auto-pilot rules",
-          description: "Turn this on when you want AI to reply automatically. CounterPro pauses it after a detected agreement so the bots do not keep saying goodbye forever.",
-          side: "left" as const,
-          align: "center" as const,
-        },
-      },
-      {
-        element: "[data-tour='thread']",
-        popover: {
-          title: "Track everything here",
-          description: "This thread is the source of truth for replies, attachments, and agreement messages, even when the mail flow is happening in the background.",
-          side: "right" as const,
-          align: "start" as const,
-        },
-      },
-    ].filter(step => document.querySelector(step.element));
-
-    if (steps.length === 0) return;
-
-    const walkthrough = driver({
-      animate: true,
-      allowClose: true,
-      overlayOpacity: 0.55,
-      showProgress: true,
-      smoothScroll: true,
-      doneBtnText: "Done",
-      nextBtnText: "Next",
-      prevBtnText: "Back",
-      steps,
-    });
-
-    if (markSeen) {
-      window.localStorage.setItem(NEGOTIATION_TOUR_STORAGE_KEY, "seen");
-    }
-
-    walkthrough.drive();
-  }, []);
 
   const latestInboundAwaitingReply = [...messages]
     .reverse()
@@ -765,7 +714,11 @@ export default function NegotiateThreadPage() {
       const res = await fetch(`/api/negotiate-suite/threads/${id}/first-contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offerAmount: amount, notes: offerNotes || undefined }),
+        body: JSON.stringify({ 
+          offerAmount: amount, 
+          notes: offerNotes || undefined,
+          tone: offerTone 
+        }),
       });
       const { draft, messageId } = await res.json();
       setPendingDraft({ draft, messageId });
@@ -790,6 +743,35 @@ export default function NegotiateThreadPage() {
       setNegotiation({ ...negotiation, autonomous_mode: next });
     } finally {
       setTogglingAuto(false);
+    }
+  };
+
+  const saveAiTone = async () => {
+    if (!negotiation || !id) return;
+    setSavingAiTone(true);
+    try {
+      // Build combined tone from base tone + regional + personality
+      let toneValue = aiTone === "custom" ? aiCustomTone : aiTone;
+      
+      // Add regional and personality prefixes if selected
+      const components = [toneValue];
+      if (aiRegionalTone) components.push(aiRegionalTone);
+      if (aiRealtorPersonality) components.push(aiRealtorPersonality);
+      
+      // Store as combined string with pipe delimiter
+      toneValue = components.join("|");
+      
+      await fetch(`/api/negotiate-suite/threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_tone: toneValue }),
+      });
+      setNegotiation({ ...negotiation, ai_tone: toneValue });
+      setShowAiSettings(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save AI tone");
+    } finally {
+      setSavingAiTone(false);
     }
   };
 
@@ -975,6 +957,25 @@ export default function NegotiateThreadPage() {
                       />
                     </div>
 
+                    {/* AI Tone */}
+                    <div className="space-y-1">
+                      <Label className="text-sm">
+                        AI Tone <span className="text-muted-foreground font-normal">(for this message only)</span>
+                      </Label>
+                      <Select value={offerTone} onValueChange={setOfferTone}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select tone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AI_TONE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="flex gap-3">
                       <Button
                         onClick={generateFirstContact}
@@ -987,7 +988,7 @@ export default function NegotiateThreadPage() {
                           </span>
                         ) : "Draft opening message →"}
                       </Button>
-                      <Button variant="ghost" onClick={() => { setShowFirstContact(false); setResearch(null); setResearchError(""); setOfferAmount(""); setOfferNotes(""); }}>
+                      <Button variant="ghost" onClick={() => { setShowFirstContact(false); setResearch(null); setResearchError(""); setOfferAmount(""); setOfferNotes(""); setOfferTone("professional"); }}>
                         Cancel
                       </Button>
                     </div>
@@ -1463,27 +1464,13 @@ export default function NegotiateThreadPage() {
                   <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Deal Info
                   </CardTitle>
-                  {tourReady && !tourDismissed && (
-                    <div className="group flex items-center rounded-md border border-transparent hover:border-border">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => startTour(false)}
-                      >
-                        Take tour
-                      </Button>
-                      <button
-                        type="button"
-                        aria-label="Dismiss negotiation tour prompt"
-                        className="mr-1 flex h-7 w-7 items-center justify-center rounded text-muted-foreground opacity-60 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
-                        onClick={dismissTourPrompt}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setShowAiSettings(true)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="AI Settings"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                  </button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -1674,6 +1661,24 @@ export default function NegotiateThreadPage() {
                     </p>
                   )}
                 </div>
+                {/* AI Tone Settings */}
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium leading-tight">AI Tone</p>
+                      <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                        {aiTone === "custom" ? aiCustomTone : AI_TONE_OPTIONS.find(o => o.value === aiTone)?.label || "Professional"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowAiSettings(true)}
+                      className="text-xs text-primary hover:underline shrink-0 flex items-center gap-1"
+                    >
+                      <Settings2 className="w-3 h-3" />
+                      Configure
+                    </button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -1845,7 +1850,7 @@ export default function NegotiateThreadPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Archive this negotiation?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{negotiation?.address}&rdquo; will be moved to your archive. You can still view it there but it won&apos;t appear in your active list.
+              This will remove the negotiation from your active list. You can still access it from the archive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1854,6 +1859,148 @@ export default function NegotiateThreadPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI Settings Dialog */}
+      <Dialog open={showAiSettings} onOpenChange={setShowAiSettings}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>AI Settings</DialogTitle>
+            <DialogDescription>
+              Configure how AI behaves in this negotiation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Default Tone Setting */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Default Response Tone</label>
+                <p className="text-xs text-muted-foreground">Applied to all AI-generated replies unless overridden</p>
+              </div>
+              <Select value={aiTone} onValueChange={setAiTone}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a tone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_TONE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {aiTone === "custom" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Custom Tone Instructions</label>
+                  <Textarea
+                    placeholder="e.g., Be very friendly and casual, use emojis, and keep sentences short..."
+                    value={aiCustomTone}
+                    onChange={(e) => setAiCustomTone(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Regional Tone Setting */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Regional Style</label>
+                <p className="text-xs text-muted-foreground">Market-specific communication approach</p>
+              </div>
+              <Select value={aiRegionalTone} onValueChange={setAiRegionalTone}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a region (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {REGIONAL_TONE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Realtor Personality Setting */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Realtor Personality</label>
+                <p className="text-xs text-muted-foreground">Sales approach and communication style</p>
+              </div>
+              <Select value={aiRealtorPersonality} onValueChange={setAiRealtorPersonality}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a personality (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {REALTOR_PERSONALITY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex flex-col">
+                        <span>{option.label}</span>
+                        <span className="text-xs text-muted-foreground">{option.desc}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Additional AI Settings */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Response Style</label>
+                <p className="text-xs text-muted-foreground">How detailed should AI responses be?</p>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input type="radio" name="responseStyle" value="concise" className="text-primary" />
+                  <span className="text-sm">Concise - Short and to the point</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input type="radio" name="responseStyle" value="balanced" defaultChecked className="text-primary" />
+                  <span className="text-sm">Balanced - Moderate detail</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input type="radio" name="responseStyle" value="detailed" className="text-primary" />
+                  <span className="text-sm">Detailed - Thorough explanations</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Autonomous Mode Settings */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Autonomous Mode Behavior</label>
+                <p className="text-xs text-muted-foreground">When auto-pilot is enabled</p>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input type="checkbox" defaultChecked className="text-primary" />
+                  <span className="text-sm">Pause on detected agreements</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input type="checkbox" defaultChecked className="text-primary" />
+                  <span className="text-sm">Include market data in responses</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input type="checkbox" className="text-primary" />
+                  <span className="text-sm">More conservative offers</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAiSettings(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveAiTone} disabled={savingAiTone || (aiTone === "custom" && !aiCustomTone.trim())}>
+              {savingAiTone ? "Saving..." : "Save Settings"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

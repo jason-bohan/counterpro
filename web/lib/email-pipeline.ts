@@ -173,15 +173,62 @@ export const AI_TONE_OPTIONS = [
   { value: "custom", label: "Custom…" },
 ] as const;
 
+export const REGIONAL_TONE_OPTIONS = [
+  { value: "coastal_west", label: "West Coast (CA, OR, WA)" },
+  { value: "southwest", label: "Southwest (AZ, NV, TX)" },
+  { value: "midwest", label: "Midwest (IL, MN, OH)" },
+  { value: "northeast", label: "Northeast (NY, MA, PA)" },
+  { value: "southeast", label: "Southeast (FL, GA, NC)" },
+  { value: "international", label: "International" },
+] as const;
+
+export const REALTOR_PERSONALITY_OPTIONS = [
+  { value: "aggressive_closer", label: "Aggressive Closer", desc: "High-pressure, deal-focused, creates urgency" },
+  { value: "consultative", label: "Consultative Advisor", desc: "Listens carefully, explains options, builds trust" },
+  { value: "relationship_builder", label: "Relationship Builder", desc: "Warm, personal, long-term oriented" },
+  { value: "data_driven", label: "Data-Driven Expert", desc: "Market analysis, facts, comparables, analytics" },
+  { value: "luxury_specialist", label: "Luxury Specialist", desc: "Sophisticated, exclusive, high-net-worth focused" },
+  { value: "neighborhood_expert", label: "Neighborhood Expert", desc: "Local knowledge, community focus, roots-based" },
+] as const;
+
 export type AiToneValue = typeof AI_TONE_OPTIONS[number]["value"];
+export type RegionalToneValue = typeof REGIONAL_TONE_OPTIONS[number]["value"];
+export type RealtorPersonalityValue = typeof REALTOR_PERSONALITY_OPTIONS[number]["value"];
 
 function toneInstruction(tone: string): string {
+  // Handle combined tone format (base_tone|regional_tone|personality_tone)
+  const toneParts = tone.split("|").filter(t => t.trim());
+  const instructions: string[] = [];
+  
+  for (const tonePart of toneParts) {
+    const instruction = getBasicToneInstruction(tonePart.trim());
+    if (instruction) instructions.push(instruction);
+  }
+  
+  return instructions.length > 0 ? instructions.join("\n") : "Tone: professional.";
+}
+
+function getBasicToneInstruction(tone: string): string {
   switch (tone) {
     case "firm": return "Tone: firm and direct — confident, no hedging, clear expectations.";
     case "collaborative": return "Tone: warm and collaborative — build rapport, emphasize mutual benefit, avoid adversarial language.";
     case "urgent": return "Tone: urgent and assertive — create a sense of time pressure, strong language, decisive.";
     case "professional": return "Tone: professional — polished, neutral, business-like.";
-    default: return tone ? `Tone: ${tone}` : "Tone: professional.";
+    // Regional tones
+    case "coastal_west": return "Style: West Coast casual but professional. Use relaxed language, emphasize lifestyle and flexibility. Be collaborative and progressive-minded.";
+    case "southwest": return "Style: Southwest direct and practical. Emphasize value, efficiency, and straightforward dealing. Can be casual but results-focused.";
+    case "midwest": return "Style: Midwest friendly and trustworthy. Emphasize reliability, practical benefits, and fair dealing. Warm but not overly formal.";
+    case "northeast": return "Style: Northeast direct and formal. Professional, efficient, fact-based. Can be blunt but always business-appropriate.";
+    case "southeast": return "Style: Southeast gracious and relationship-focused. Build personal connection, use respectful language, emphasize community fit.";
+    case "international": return "Style: International professional. Formal, clear, avoid idioms. Emphasize global standards and mutual respect.";
+    // Realtor personalities
+    case "aggressive_closer": return "Personality: You are an aggressive closer. Create urgency, highlight competition, emphasize deadlines, focus on closing the deal now.";
+    case "consultative": return "Personality: You are a consultative advisor. Listen to concerns, explain options thoroughly, provide multiple perspectives, build confidence.";
+    case "relationship_builder": return "Personality: You are a relationship builder. Emphasize personal connection, long-term thinking, caring about their success, warmth and empathy.";
+    case "data_driven": return "Personality: You are data-driven. Use market data, comparables, statistics, and analysis. Be precise, fact-based, and analytical.";
+    case "luxury_specialist": return "Personality: You are a luxury specialist. Emphasize exclusivity, sophisticated tastes, high-end amenities, and refined clientele.";
+    case "neighborhood_expert": return "Personality: You are a neighborhood expert. Highlight local knowledge, community connections, neighborhood benefits, and community integration.";
+    default: return tone ? `Tone: ${tone}` : "";
   }
 }
 
