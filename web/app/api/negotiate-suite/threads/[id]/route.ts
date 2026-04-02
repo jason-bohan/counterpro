@@ -38,10 +38,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   `;
 
   const documents = await sql`
-    SELECT id, filename, blob_url, mime_type, size_bytes, direction, message_id, created_at
-    FROM negotiation_documents
+    SELECT
+      d.id,
+      d.filename,
+      d.blob_url,
+      d.mime_type,
+      d.size_bytes,
+      d.direction,
+      d.message_id,
+      d.created_at,
+      (
+        SELECT COUNT(*)::int
+        FROM negotiation_documents d2
+        WHERE d2.blob_url = d.blob_url
+      ) AS shared_count
+    FROM negotiation_documents d
     WHERE negotiation_id = ${id}
-    ORDER BY created_at DESC
+    ORDER BY d.created_at DESC
   `;
 
   const isCounterProAlias =

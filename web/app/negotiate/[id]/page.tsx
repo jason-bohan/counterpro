@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AppHeader } from "@/components/app-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2 } from "lucide-react";
+import { Download, Settings2 } from "lucide-react";
 import { AI_TONE_OPTIONS, REGIONAL_TONE_OPTIONS, REALTOR_PERSONALITY_OPTIONS } from "@/lib/email-pipeline";
 const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
 
@@ -47,6 +47,7 @@ type NegotiationDocument = {
   direction: "sent" | "received";
   message_id: number | null;
   created_at: string;
+  shared_count?: number;
 };
 
 type Negotiation = {
@@ -893,24 +894,44 @@ export default function NegotiateThreadPage() {
   const isMarkdownDocument = (doc: NegotiationDocument) =>
     doc.mime_type.startsWith("text/markdown") || doc.filename.toLowerCase().endsWith(".md");
 
-  const openDocument = async (doc: NegotiationDocument) => {
-    if (!isMarkdownDocument(doc)) {
-      window.open(doc.blob_url, "_blank", "noopener,noreferrer");
-      return;
-    }
+  const isImageDocument = (doc: NegotiationDocument) => doc.mime_type.startsWith("image/");
 
+  const isPdfDocument = (doc: NegotiationDocument) =>
+    doc.mime_type === "application/pdf" || doc.filename.toLowerCase().endsWith(".pdf");
+
+  const isTextDocument = (doc: NegotiationDocument) =>
+    doc.mime_type.startsWith("text/") && !isMarkdownDocument(doc);
+
+  const openDocument = async (doc: NegotiationDocument) => {
     setPreviewDoc(doc);
-    setPreviewLoading(true);
     setPreviewContent("");
-    try {
-      const res = await fetch(doc.blob_url);
-      const text = await res.text();
-      setPreviewContent(text);
-    } catch {
-      setPreviewContent("Could not load this document preview.");
-    } finally {
+    if (isMarkdownDocument(doc) || isTextDocument(doc)) {
+      setPreviewLoading(true);
+      try {
+        const res = await fetch(doc.blob_url);
+        const text = await res.text();
+        setPreviewContent(text);
+      } catch {
+        setPreviewContent("Could not load this document preview.");
+      } finally {
+        setPreviewLoading(false);
+      }
+    } else {
       setPreviewLoading(false);
     }
+  };
+
+  const deleteDocument = async (doc: NegotiationDocument) => {
+    const isShared = (doc.shared_count ?? 1) > 1;
+    const confirmed = confirm(
+      isShared
+        ? `Remove "${doc.filename}" from this negotiation? Other references will keep the underlying file available.`
+        : `Delete "${doc.filename}"? This will remove the file from this negotiation and delete the stored file if nothing else references it.`
+    );
+    if (!confirmed) return;
+
+    await fetch(`/api/negotiate-suite/documents/${doc.id}`, { method: "DELETE" });
+    load();
   };
 
   const saveAiTone = async () => {
@@ -1245,15 +1266,11 @@ export default function NegotiateThreadPage() {
                                   <span className="truncate max-w-[200px]">{doc.filename}</span>
                                 </button>
                                 <button
-                                  onClick={async () => {
-                                    if (!confirm(`Delete "${doc.filename}"?`)) return;
-                                    await fetch(`/api/negotiate-suite/documents/${doc.id}`, { method: "DELETE" });
-                                    load();
-                                  }}
+                                  onClick={() => deleteDocument(doc)}
                                   className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1 rounded ${
                                     isOutbound ? "text-primary-foreground/60 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive"
                                   }`}
-                                  title="Delete document"
+                                  title={(doc.shared_count ?? 1) > 1 ? "Remove shared document from this negotiation" : "Delete document"}
                                 >
                                   ×
                                 </button>
@@ -2106,23 +2123,33 @@ export default function NegotiateThreadPage() {
                   {documents.map(doc => {
                     const icon = doc.mime_type === "application/pdf" ? "📄" : doc.mime_type.startsWith("image/") ? "🖼️" : "📎";
                     return (
-                      <button
-                        key={doc.id}
-                        type="button"
-                        onClick={() => openDocument(doc)}
-                        className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
-                      >
-                        <span className="text-base shrink-0">{icon}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
-                            {doc.filename}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
-                            {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
-                          </p>
-                        </div>
-                      </button>
+                      <div key={doc.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted transition-colors group">
+                        <button
+                          type="button"
+                          onClick={() => openDocument(doc)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-sm text-left"
+                        >
+                          <span className="text-base shrink-0">{icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
+                              {doc.filename}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.direction === "sent" ? "Sent" : "Received"} · {relativeTime(doc.created_at)}
+                              {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
+                              {(doc.shared_count ?? 1) > 1 ? ` · Shared ${(doc.shared_count ?? 1)}x` : ""}
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteDocument(doc)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1 rounded text-muted-foreground hover:text-destructive shrink-0"
+                          title={(doc.shared_count ?? 1) > 1 ? "Remove shared document from this negotiation" : "Delete document"}
+                        >
+                          ×
+                        </button>
+                      </div>
                     );
                   })}
                 </CardContent>
@@ -2149,7 +2176,7 @@ export default function NegotiateThreadPage() {
       </AlertDialog>
 
       <Dialog open={!!previewDoc} onOpenChange={open => { if (!open) { setPreviewDoc(null); setPreviewContent(""); } }}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{previewDoc?.filename ?? "Document preview"}</DialogTitle>
             <DialogDescription>
@@ -2165,14 +2192,43 @@ export default function NegotiateThreadPage() {
                   {previewContent}
                 </ReactMarkdown>
               </div>
+            ) : previewDoc && isImageDocument(previewDoc) ? (
+              <div className="flex items-center justify-center py-4">
+                <img
+                  src={previewDoc.blob_url}
+                  alt={previewDoc.filename}
+                  className="max-h-[65vh] w-auto max-w-full rounded-lg border bg-background object-contain"
+                />
+              </div>
+            ) : previewDoc && isPdfDocument(previewDoc) ? (
+              <div className="h-[65vh] overflow-hidden rounded-lg border bg-background">
+                <iframe
+                  src={previewDoc.blob_url}
+                  title={previewDoc.filename}
+                  className="h-full w-full"
+                />
+              </div>
+            ) : previewDoc && isTextDocument(previewDoc) ? (
+              <pre className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed text-foreground">
+                {previewContent}
+              </pre>
             ) : (
               <div className="py-12 text-sm text-muted-foreground">Preview not available for this file type.</div>
             )}
           </div>
           {previewDoc && (
             <DialogFooter>
-              <Button variant="outline" asChild>
-                <a href={previewDoc.blob_url} target="_blank" rel="noopener noreferrer">Open original</a>
+              <Button variant="outline" size="icon" asChild>
+                <a
+                  href={previewDoc.blob_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={previewDoc.filename}
+                  aria-label={`Download ${previewDoc.filename}`}
+                  title="Download"
+                >
+                  <Download className="h-4 w-4" />
+                </a>
               </Button>
             </DialogFooter>
           )}

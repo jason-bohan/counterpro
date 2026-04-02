@@ -22,14 +22,21 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   `;
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Delete from Blob storage first; if it fails, don't delete the DB record
-  try {
-    await del(doc.blob_url);
-  } catch {
-    // Blob may already be gone — continue to remove the DB record
-  }
-
   await sql`DELETE FROM negotiation_documents WHERE id = ${id}`;
 
-  return NextResponse.json({ ok: true });
+  const [{ count }] = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM negotiation_documents
+    WHERE blob_url = ${doc.blob_url}
+  `;
+
+  if ((count ?? 0) === 0) {
+    try {
+      await del(doc.blob_url);
+    } catch {
+      // Blob may already be gone — DB record is already removed
+    }
+  }
+
+  return NextResponse.json({ ok: true, deleted_blob: (count ?? 0) === 0 });
 }
