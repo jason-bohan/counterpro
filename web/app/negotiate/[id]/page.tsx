@@ -249,6 +249,12 @@ export default function NegotiateThreadPage() {
   const [aiRealtorPersonality, setAiRealtorPersonality] = useState("");
   const [savingAiTone, setSavingAiTone] = useState(false);
 
+  // Draft refine panel
+  const [showRefine, setShowRefine] = useState(false);
+  const [draftToneOverride, setDraftToneOverride] = useState("");
+  const [draftCustomToneOverride, setDraftCustomToneOverride] = useState("");
+  const [draftHints, setDraftHints] = useState("");
+
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [dlLabel, setDlLabel] = useState("");
@@ -394,12 +400,17 @@ export default function NegotiateThreadPage() {
     if (!pendingDraft || !id) return;
     setGeneratingReply(true);
     try {
+      const toneOverride = draftToneOverride === "custom"
+        ? draftCustomToneOverride || undefined
+        : draftToneOverride || undefined;
       const res = await fetch("/api/negotiate-suite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           negotiationId: Number(id),
           replyToMessageId: pendingDraft.messageId,
+          toneOverride,
+          hints: draftHints.trim() || undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to regenerate AI reply.");
@@ -1107,6 +1118,56 @@ export default function NegotiateThreadPage() {
                     onChange={e => setEditedDraft(e.target.value)}
                     className="text-sm font-mono resize-y"
                   />
+
+                  {/* Refine panel */}
+                  <div className="rounded-md border border-border bg-muted/40">
+                    <button
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowRefine(v => !v)}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Settings2 className="w-3.5 h-3.5" />
+                        Refine AI response
+                      </span>
+                      <span>{showRefine ? "▲" : "▼"}</span>
+                    </button>
+                    {showRefine && (
+                      <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Tone override</label>
+                          <Select value={draftToneOverride} onValueChange={setDraftToneOverride}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Use negotiation default" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Use negotiation default</SelectItem>
+                              {AI_TONE_OPTIONS.map(o => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {draftToneOverride === "custom" && (
+                            <Input
+                              className="h-8 text-xs mt-1"
+                              placeholder="Describe the tone..."
+                              value={draftCustomToneOverride}
+                              onChange={e => setDraftCustomToneOverride(e.target.value)}
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Keywords / extra context for AI</label>
+                          <Input
+                            className="text-xs h-8"
+                            placeholder="e.g. mention inspection contingency, be firm on price"
+                            value={draftHints}
+                            onChange={e => setDraftHints(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex flex-wrap gap-3">
                     {hasEmail ? (
                       <Button

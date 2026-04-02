@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
   const allowed = await canUserRunSuite(userId);
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
-  const { negotiationId, newMessage, replyToMessageId } = await req.json();
+  const { negotiationId, newMessage, replyToMessageId, toneOverride, hints } = await req.json();
 
   // Generate a draft for an existing inbound message that has not been handled yet.
   if (replyToMessageId) {
     const [target] = await sql`
-      SELECT nm.*, n.address
+      SELECT nm.*, n.address, n.ai_tone
       FROM negotiation_messages nm
       JOIN negotiations n ON n.id = nm.negotiation_id
       WHERE nm.id = ${replyToMessageId}
@@ -41,11 +41,14 @@ export async function POST(req: NextRequest) {
       ORDER BY created_at ASC
     `;
 
+    const resolvedTone = toneOverride ?? target.ai_tone ?? "professional";
+    const hintsLine = hints ? `\nAdditional guidance: ${hints}` : "";
     const prompt = buildNegotiationPrompt(
       target.address,
       history as Array<{ direction: string; content: string }>,
-      target.content
-    );
+      target.content,
+      resolvedTone
+    ) + hintsLine;
 
     const message = await client.messages.create({
       model: CLAUDE_MODEL,
