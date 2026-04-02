@@ -445,17 +445,8 @@ export default function NegotiateThreadPage() {
     if (typeof window === "undefined") return;
     if (!user?.id) return;
 
-    setTourReady(true);
-    setTourDismissed(window.localStorage.getItem(negotiationTourDismissedKey) === "true");
     window.localStorage.setItem(threadVisitedKey, "true");
-  }, [loading, negotiation, negotiationTourDismissedKey, threadVisitedKey, user?.id]);
-
-  const dismissTourPrompt = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(negotiationTourDismissedKey, "true");
-    }
-    setTourDismissed(true);
-  };
+  }, [loading, negotiation, threadVisitedKey, user?.id]);
 
   const submitInbound = async () => {
     if (!newMsg.trim()) return;
