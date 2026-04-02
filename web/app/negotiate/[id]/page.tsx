@@ -240,6 +240,7 @@ export default function NegotiateThreadPage() {
   const [offerCustomTone, setOfferCustomTone] = useState("");
   const [generatingFirst, setGeneratingFirst] = useState(false);
   const [generatingReply, setGeneratingReply] = useState(false);
+  const [quickReplying, setQuickReplying] = useState(false);
 
   // AI Settings
   const [showAiSettings, setShowAiSettings] = useState(false);
@@ -448,6 +449,37 @@ export default function NegotiateThreadPage() {
       alert(err instanceof Error ? err.message : "Failed to generate AI reply.");
     } finally {
       setGeneratingReply(false);
+    }
+  };
+
+  // Reply with AI: generate + approve + send immediately (no review step)
+  const replyWithAiNow = async () => {
+    if (!latestInboundAwaitingReply || !id) return;
+    setQuickReplying(true);
+    try {
+      const genRes = await fetch("/api/negotiate-suite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          negotiationId: Number(id),
+          replyToMessageId: latestInboundAwaitingReply.id,
+        }),
+      });
+      if (!genRes.ok) throw new Error("Failed to generate AI reply.");
+      const { messageId } = await genRes.json();
+
+      const sendRes = await fetch("/api/negotiate-suite", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, approved: true }),
+      });
+      if (!sendRes.ok) throw new Error("Failed to send reply.");
+      window.dispatchEvent(new Event("notifications-updated"));
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to send AI reply.");
+    } finally {
+      setQuickReplying(false);
     }
   };
 
@@ -1261,12 +1293,22 @@ export default function NegotiateThreadPage() {
                       + Add their message
                     </Button>
                     {latestInboundAwaitingReply && (
-                      <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
-                        {generatingReply ? "Generating..." : "Reply with AI"}
+                      <Button variant="outline" onClick={replyWithAiNow} disabled={quickReplying || generatingReply}>
+                        {quickReplying ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Sending...
+                          </span>
+                        ) : "Reply with AI"}
                       </Button>
                     )}
-                    <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
-                      {generatingReply ? "Generating..." : "Compose with AI"}
+                    <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply || quickReplying}>
+                      {generatingReply ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Composing...
+                        </span>
+                      ) : "Compose with AI"}
                     </Button>
                   </div>
                 ) : showInbound ? (
