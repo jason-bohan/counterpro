@@ -126,28 +126,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const [theirsHasMessages] = await sql`
-    SELECT 1 FROM negotiation_messages WHERE negotiation_id = ${theirs.id}
-      AND direction = 'inbound' AND content != '[First contact]' LIMIT 1
-  `;
-  if (!theirsHasMessages) {
-    const mineSent = await sql`
-      SELECT content, ai_draft, sent_at, created_at
-      FROM negotiation_messages
-      WHERE negotiation_id = ${mine.id}
-        AND approved = true
-      ORDER BY created_at ASC
-    `;
-    for (const msg of mineSent) {
-      const body = msg.content === "[First contact]"
-        ? (msg.ai_draft ?? msg.content)
-        : msg.content;
-      await sql`
-        INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at, created_at)
-        VALUES (${theirs.id}, 'inbound', ${body}, true, ${msg.sent_at ?? msg.created_at}, ${msg.created_at})
-      `;
-    }
-  }
-
   return NextResponse.json({ ok: true, pairedAddress: theirs.address });
 }
