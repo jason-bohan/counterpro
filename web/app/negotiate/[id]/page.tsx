@@ -1793,13 +1793,29 @@ export default function NegotiateThreadPage() {
                       <span className={negotiation.counterparty_email ? "text-foreground" : "text-muted-foreground"}>
                         {emailValue || "Not set"}
                       </span>
-                      <button
-                        onClick={() => setEditingEmail(true)}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Edit
-                      </button>
+                      {isPairedCounterparty ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="text-xs text-muted-foreground/60 cursor-not-allowed"
+                          title="Conversation is paired to another CounterPro thread. Unpair it before editing an external email."
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setEditingEmail(true)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Edit
+                        </button>
+                      )}
                     </div>
+                  )}
+                  {isPairedCounterparty && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Conversation is paired. Unpair it before using an external counterparty email.
+                    </p>
                   )}
                 </div>
                 <div className="pt-2 border-t" data-tour="pairing">
