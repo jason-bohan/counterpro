@@ -1919,22 +1919,22 @@ export default function NegotiateThreadPage() {
 
       {/* AI Settings Dialog */}
       <Dialog open={showAiSettings} onOpenChange={setShowAiSettings}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>AI Settings</DialogTitle>
             <DialogDescription>
               Configure how AI behaves in this negotiation.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            {/* Default Tone Setting */}
-            <div className="space-y-3">
+          <div className="space-y-5 py-2 overflow-y-auto flex-1 pr-1">
+            {/* Default Tone */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Default Response Tone</label>
                 <p className="text-xs text-muted-foreground">Applied to all AI-generated replies unless overridden</p>
               </div>
               <Select value={aiTone} onValueChange={setAiTone}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a tone" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1945,29 +1945,25 @@ export default function NegotiateThreadPage() {
                   ))}
                 </SelectContent>
               </Select>
-              
               {aiTone === "custom" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Custom Tone Instructions</label>
-                  <Textarea
-                    placeholder="e.g., Be very friendly and casual, use emojis, and keep sentences short..."
-                    value={aiCustomTone}
-                    onChange={(e) => setAiCustomTone(e.target.value)}
-                    rows={3}
-                  />
-                </div>
+                <Textarea
+                  placeholder="e.g., Be very friendly and casual, use emojis, and keep sentences short..."
+                  value={aiCustomTone}
+                  onChange={(e) => setAiCustomTone(e.target.value)}
+                  rows={3}
+                />
               )}
             </div>
 
-            {/* Regional Tone Setting */}
-            <div className="space-y-3">
+            {/* Regional Style */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Regional Style</label>
                 <p className="text-xs text-muted-foreground">Market-specific communication approach</p>
               </div>
               <Select value={aiRegionalTone} onValueChange={setAiRegionalTone}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a region (optional)" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
@@ -1980,75 +1976,29 @@ export default function NegotiateThreadPage() {
               </Select>
             </div>
 
-            {/* Realtor Personality Setting */}
-            <div className="space-y-3">
+            {/* Realtor Personality */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Realtor Personality</label>
                 <p className="text-xs text-muted-foreground">Sales approach and communication style</p>
               </div>
               <Select value={aiRealtorPersonality} onValueChange={setAiRealtorPersonality}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a personality (optional)" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   {REALTOR_PERSONALITY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span>{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.desc}</span>
-                      </div>
+                      <span>{option.label}</span>
+                      <span className="ml-1.5 text-xs text-muted-foreground">{option.desc}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Additional AI Settings */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Response Style</label>
-                <p className="text-xs text-muted-foreground">How detailed should AI responses be?</p>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="concise" className="text-primary" />
-                  <span className="text-sm">Concise - Short and to the point</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="balanced" defaultChecked className="text-primary" />
-                  <span className="text-sm">Balanced - Moderate detail</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="detailed" className="text-primary" />
-                  <span className="text-sm">Detailed - Thorough explanations</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Autonomous Mode Settings */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Autonomous Mode Behavior</label>
-                <p className="text-xs text-muted-foreground">When auto-pilot is enabled</p>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" defaultChecked className="text-primary" />
-                  <span className="text-sm">Pause on detected agreements</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" defaultChecked className="text-primary" />
-                  <span className="text-sm">Include market data in responses</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" className="text-primary" />
-                  <span className="text-sm">More conservative offers</span>
-                </label>
-              </div>
-            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 pt-2">
             <Button variant="outline" onClick={() => setShowAiSettings(false)}>
               Cancel
             </Button>
