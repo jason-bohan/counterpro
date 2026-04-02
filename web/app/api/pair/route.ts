@@ -101,5 +101,53 @@ export async function POST(req: NextRequest) {
     WHERE id = ${theirs.id}
   `;
 
+  // Seed message history — copy each party's sent messages into the other's thread
+  // so both sides have the full conversation context from day one.
+  // Only copy into a thread if it has no messages yet (avoids duplicates on re-pair).
+  const [mineHasMessages] = await sql`
+    SELECT 1 FROM negotiation_messages WHERE negotiation_id = ${mine.id} LIMIT 1
+  `;
+  if (!mineHasMessages) {
+    const theirSent = await sql`
+      SELECT content, ai_draft, sent_at, created_at
+      FROM negotiation_messages
+      WHERE negotiation_id = ${theirs.id}
+        AND approved = true
+      ORDER BY created_at ASC
+    `;
+    for (const msg of theirSent) {
+      const body = msg.content === "[First contact]"
+        ? (msg.ai_draft ?? msg.content)
+        : msg.content;
+      await sql`
+        INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at, created_at)
+        VALUES (${mine.id}, 'inbound', ${body}, true, ${msg.sent_at ?? msg.created_at}, ${msg.created_at})
+      `;
+    }
+  }
+
+  const [theirsHasMessages] = await sql`
+    SELECT 1 FROM negotiation_messages WHERE negotiation_id = ${theirs.id}
+      AND direction = 'inbound' AND content != '[First contact]' LIMIT 1
+  `;
+  if (!theirsHasMessages) {
+    const mineSent = await sql`
+      SELECT content, ai_draft, sent_at, created_at
+      FROM negotiation_messages
+      WHERE negotiation_id = ${mine.id}
+        AND approved = true
+      ORDER BY created_at ASC
+    `;
+    for (const msg of mineSent) {
+      const body = msg.content === "[First contact]"
+        ? (msg.ai_draft ?? msg.content)
+        : msg.content;
+      await sql`
+        INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at, created_at)
+        VALUES (${theirs.id}, 'inbound', ${body}, true, ${msg.sent_at ?? msg.created_at}, ${msg.created_at})
+      `;
+    }
+  }
+
   return NextResponse.json({ ok: true, pairedAddress: theirs.address });
 }
