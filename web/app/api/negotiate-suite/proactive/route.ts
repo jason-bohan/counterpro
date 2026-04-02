@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
 import { buildProactivePrompt, SUITE_SYSTEM_PROMPT } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
-import { fetchRentcastPropertyContext, formatRentcastPropertyContext } from "@/lib/property-research";
+import { fetchRentcastPropertyContext, formatRentcastPropertyContext, buildPropertyDetailsDocument } from "@/lib/property-research";
+import { put } from "@vercel/blob";
+import { buildDocumentBlobPath } from "@/lib/utils";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -70,9 +72,32 @@ export async function POST(req: NextRequest) {
       `;
 
       console.log("Proactive API: Found messages:", messages.length);
+      const rentcastData = includePropertyContext
+        ? await fetchRentcastPropertyContext(neg.address)
+        : null;
       const propertyContext = includePropertyContext
-        ? formatRentcastPropertyContext(await fetchRentcastPropertyContext(neg.address))
+        ? formatRentcastPropertyContext(rentcastData)
         : "";
+
+      if (includePropertyContext) {
+        try {
+          const propertyDoc = buildPropertyDetailsDocument(neg.address, rentcastData);
+          const filename = `property-details-${new Date().toISOString().slice(0, 10)}.md`;
+          const blobPath = buildDocumentBlobPath(userId, Number(negotiationId), filename);
+          const body = Buffer.from(propertyDoc, "utf8");
+          const { url } = await put(blobPath, body, {
+            access: "public",
+            contentType: "text/markdown; charset=utf-8",
+          });
+          await sql`
+            INSERT INTO negotiation_documents (negotiation_id, clerk_user_id, filename, blob_url, mime_type, size_bytes, direction, message_id)
+            VALUES (${Number(negotiationId)}, ${userId}, ${filename}, ${url}, 'text/markdown', ${body.length}, 'received', null)
+          `;
+        } catch (propertyDocError) {
+          console.error("Proactive API: Failed to save property details document", propertyDocError);
+        }
+      }
+
       const prompt = buildProactivePrompt(
         neg.address,
         messages as Array<{ direction: string; content: string }>,
