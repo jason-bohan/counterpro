@@ -594,18 +594,39 @@ export default function AdminPage() {
               <CardHeader><CardTitle className="text-base">Recent paid users</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {data?.recentPlans.filter(p => p.plan !== "free").map(p => (
-                    <div key={p.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{data?.userEmails[p.clerk_user_id] ?? "—"}</p>
-                        <p className="font-mono text-xs text-muted-foreground truncate">{p.clerk_user_id}</p>
+                  {data?.recentPlans.filter(p => p.plan !== "free").map(p => {
+                    const planColors: Record<string, string> = {
+                      suite: "bg-pink-100 text-pink-800 border-pink-200",
+                      subscription: "bg-blue-100 text-blue-800 border-blue-200",
+                      single: "bg-green-100 text-green-800 border-green-200",
+                    };
+                    return (
+                      <div key={p.clerk_user_id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{data?.userEmails[p.clerk_user_id] ?? "—"}</p>
+                          <p className="font-mono text-xs text-muted-foreground truncate">{p.clerk_user_id}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs px-2 py-0.5 rounded border font-medium capitalize ${planColors[p.plan] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                            {p.plan}
+                          </span>
+                          {p.plan === "single" && <span className="text-muted-foreground">{p.deals_remaining} left</span>}
+                          {p.plan === "suite" && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Revoke suite from ${data?.userEmails[p.clerk_user_id] ?? p.clerk_user_id}?`)) return;
+                                await api({ action: "revoke_suite", clerk_user_id: p.clerk_user_id });
+                                load();
+                              }}
+                              className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2"
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={p.plan === "subscription" ? "default" : "secondary"}>{p.plan}</Badge>
-                        {p.plan === "single" && <span className="text-muted-foreground">{p.deals_remaining} left</span>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

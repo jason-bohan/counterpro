@@ -138,6 +138,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "revoke_suite") {
+    await sql`
+      UPDATE user_plans SET plan = 'free', subscription_end = NULL, updated_at = NOW()
+      WHERE clerk_user_id = ${data.clerk_user_id}
+    `;
+    return NextResponse.json({ ok: true });
+  }
+
   if (action === "simulate_inbound") {
     // Directly insert a fake inbound message and generate an AI draft
     const { negotiation_id, message_body } = data;
