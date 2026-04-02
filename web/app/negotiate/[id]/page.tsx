@@ -570,6 +570,7 @@ export default function NegotiateThreadPage() {
       const { draft, messageId } = await res.json();
       // Show the refined draft inside the compose panel for approve/dismiss
       setRefinedDraft({ text: draft, messageId, original: proactiveMsg });
+      load();
     } finally {
       setProactiveDrafting(false);
     }

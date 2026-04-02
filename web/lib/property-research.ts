@@ -98,3 +98,19 @@ export function formatRentcastPropertyContext(data: RentcastPropertyContext): st
 
   return lines.join("\n");
 }
+
+export function buildPropertyDetailsDocument(address: string, data: RentcastPropertyContext): string {
+  const context = formatRentcastPropertyContext(data);
+  if (!context) {
+    return `Property details\n\nAddress: ${address}\n\nNo live property details were available for this address at the time of lookup.`;
+  }
+
+  return [
+    "Property details",
+    "",
+    `Address: ${address}`,
+    `Generated: ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+    "",
+    context,
+  ].join("\n");
+}
