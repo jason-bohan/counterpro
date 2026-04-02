@@ -173,6 +173,7 @@ export async function setupDatabase() {
   `);
 
   await m("negotiations.ai_tone", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS ai_tone TEXT NOT NULL DEFAULT 'professional'`);
+  await m("negotiations.property_context", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS property_context TEXT`);
   await m("negotiations.pairing_token", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS pairing_token TEXT`);
   await m("uq_pairing_token", sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_pairing_token ON negotiations (pairing_token) WHERE pairing_token IS NOT NULL`);
   // Backfill pairing tokens for existing negotiations
