@@ -207,6 +207,7 @@ export default function NegotiateThreadPage() {
   const [proactiveDrafting, setProactiveDrafting] = useState(false);
   const [quickSending, setQuickSending] = useState(false);
   const [proactiveAttachment, setProactiveAttachment] = useState<File | null>(null);
+  const [includePropertyContext, setIncludePropertyContext] = useState(false);
   // After AI refinement, hold the result here for in-panel approve/dismiss
   const [refinedDraft, setRefinedDraft] = useState<{ text: string; messageId: number; original: string } | null>(null);
 
@@ -556,6 +557,7 @@ export default function NegotiateThreadPage() {
       const formData = new FormData();
       formData.append("negotiationId", id.toString());
       formData.append("message", proactiveMsg);
+      formData.append("includePropertyContext", includePropertyContext ? "true" : "false");
       if (proactiveAttachment) {
         formData.append("attachment", proactiveAttachment);
       }
@@ -633,6 +635,7 @@ export default function NegotiateThreadPage() {
       
       setProactiveMsg("");
       setProactiveAttachment(null);
+      setIncludePropertyContext(false);
       setShowProactive(false);
       // Clear file input
       const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
@@ -1495,6 +1498,7 @@ export default function NegotiateThreadPage() {
                                   setRefinedDraft(null);
                                   setProactiveMsg("");
                                   setProactiveAttachment(null);
+                                  setIncludePropertyContext(false);
                                   setShowProactive(false);
                                   window.dispatchEvent(new Event("notifications-updated"));
                                   load();
@@ -1529,6 +1533,7 @@ export default function NegotiateThreadPage() {
                                 setRefinedDraft(null);
                                 setProactiveMsg("");
                                 setProactiveAttachment(null);
+                                setIncludePropertyContext(false);
                                 setShowProactive(false);
                                 await fetch("/api/negotiate-suite", {
                                   method: "PUT",
@@ -1597,6 +1602,20 @@ export default function NegotiateThreadPage() {
                               </p>
                             )}
                           </div>
+                          <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={includePropertyContext}
+                              onChange={e => setIncludePropertyContext(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 rounded border-input"
+                            />
+                            <div className="space-y-0.5">
+                              <span className="text-sm font-medium">Fetch property details for this draft</span>
+                              <p className="text-xs text-muted-foreground">
+                                Pull live property and market data like last sale, size, and zip-level stats before polishing with AI.
+                              </p>
+                            </div>
+                          </label>
                           <div className="flex gap-3 flex-wrap">
                             <Button
                               onClick={quickSendProactive}
@@ -1625,6 +1644,7 @@ export default function NegotiateThreadPage() {
                               setShowProactive(false);
                               setProactiveMsg("");
                               setProactiveAttachment(null);
+                              setIncludePropertyContext(false);
                               const fileInput = document.getElementById('proactive-file') as HTMLInputElement;
                               if (fileInput) fileInput.value = '';
                             }}>

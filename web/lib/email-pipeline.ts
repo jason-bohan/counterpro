@@ -291,16 +291,22 @@ Draft my response:`;
 export function buildProactivePrompt(
   address: string,
   history: Array<{ direction: string; content: string }>,
-  userMessage: string
+  userMessage: string,
+  propertyContext?: string | null
 ): string {
   const historyText = history
     .map(m => `[${m.direction === "inbound" ? "COUNTERPARTY" : "YOU"}]: ${m.content}`)
     .join("\n\n");
+  const propertySection = propertyContext
+    ? `\n\nRelevant property details and market context:\n${propertyContext}`
+    : "";
 
   return `Property: ${address}
 
 Negotiation history so far:
 ${historyText || "(No prior messages)"}
+
+${propertySection}
 
 User's exact draft message:
 "${userMessage}"
@@ -308,6 +314,7 @@ User's exact draft message:
 Refine this message into a professional, strategic email that:
 - Preserves the substance, intent, and key facts from the user's exact draft
 - Uses the negotiation history above for context and consistency
+- Uses the property details above only when they genuinely support the user's message
 - Maintains the professional tone of the negotiation
 - Is concise and impactful
 - Ends with a clear next step if appropriate

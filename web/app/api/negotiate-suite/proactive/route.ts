@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
 import { buildProactivePrompt, SUITE_SYSTEM_PROMPT } from "@/lib/email-pipeline";
 import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
+import { fetchRentcastPropertyContext, formatRentcastPropertyContext } from "@/lib/property-research";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -33,8 +34,15 @@ export async function POST(req: NextRequest) {
     const message = formData.get("message") as string;
     const attachment = formData.get("attachment") as File | null;
     const skipAI = formData.get("skipAI") as string;
+    const includePropertyContext = formData.get("includePropertyContext") === "true";
 
-    console.log("Proactive API: Parsed data:", { negotiationId, message: message?.substring(0, 100), hasAttachment: !!attachment, skipAI });
+    console.log("Proactive API: Parsed data:", {
+      negotiationId,
+      message: message?.substring(0, 100),
+      hasAttachment: !!attachment,
+      skipAI,
+      includePropertyContext,
+    });
 
     if (!negotiationId || !message) {
       console.log("Proactive API: Missing required fields");
@@ -62,10 +70,14 @@ export async function POST(req: NextRequest) {
       `;
 
       console.log("Proactive API: Found messages:", messages.length);
+      const propertyContext = includePropertyContext
+        ? formatRentcastPropertyContext(await fetchRentcastPropertyContext(neg.address))
+        : "";
       const prompt = buildProactivePrompt(
         neg.address,
         messages as Array<{ direction: string; content: string }>,
-        message
+        message,
+        propertyContext
       );
 
       const claudeMessage = await client.messages.create({
