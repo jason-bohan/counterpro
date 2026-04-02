@@ -479,7 +479,7 @@ export default function AdminPage() {
         {/* All Users */}
         {activeTab === "allUsers" && (() => {
           const planColors: Record<string, string> = {
-            suite: "bg-purple-100 text-purple-800 border-purple-200",
+            suite: "bg-pink-100 text-pink-800 border-pink-200",
             subscription: "bg-blue-100 text-blue-800 border-blue-200",
             single: "bg-green-100 text-green-800 border-green-200",
             free: "bg-gray-100 text-gray-600 border-gray-200",

@@ -85,7 +85,7 @@ function DashboardInner() {
   const planLabel = () => {
     if (!plan || plan.plan === "free") return null;
     if (plan.plan === "subscription") return <Badge className="bg-green-600 text-white">Unlimited subscription</Badge>;
-    if (plan.plan === "suite") return <Badge className="bg-purple-600 text-white">Suite</Badge>;
+    if (plan.plan === "suite") return <Badge className="bg-pink-600 text-white">Suite</Badge>;
     if (plan.plan === "single") return <Badge variant="outline">{plan.deals_remaining} deal credit{plan.deals_remaining !== 1 ? "s" : ""} remaining</Badge>;
     return null;
   };
@@ -259,7 +259,7 @@ function DashboardInner() {
                   <Badge className="text-xs">New</Badge>
                 )}
                 {plan?.plan === "suite" && (
-                  <Badge className="text-xs bg-purple-600 text-white">Active</Badge>
+                  <Badge className="text-xs bg-pink-600 text-white">Active</Badge>
                 )}
               </div>
               <p className="font-semibold">Full Negotiation Suite</p>
