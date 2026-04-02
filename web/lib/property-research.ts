@@ -100,17 +100,74 @@ export function formatRentcastPropertyContext(data: RentcastPropertyContext): st
 }
 
 export function buildPropertyDetailsDocument(address: string, data: RentcastPropertyContext): string {
-  const context = formatRentcastPropertyContext(data);
-  if (!context) {
-    return `Property details\n\nAddress: ${address}\n\nNo live property details were available for this address at the time of lookup.`;
+  if (!data) {
+    return [
+      "# Property Details",
+      "",
+      `**Address:** ${address}`,
+      `**Generated:** ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+      "",
+      "No live property details were available for this address at the time of lookup.",
+    ].join("\n");
   }
 
-  return [
-    "Property details",
+  const { prop, market, lastSalePrice } = data;
+  const lines: string[] = [
+    "# Property Details",
     "",
-    `Address: ${address}`,
-    `Generated: ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+    `**Address:** ${address}`,
+    `**Generated:** ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
     "",
-    context,
-  ].join("\n");
+    "## Core Facts",
+    "",
+    `- Property type: ${prop.propertyType ?? "Unknown"}`,
+    `- Beds / baths: ${prop.bedrooms ?? "?"} / ${prop.bathrooms ?? "?"}`,
+    `- Square footage: ${prop.squareFootage ? prop.squareFootage.toLocaleString() : "Unknown"}`,
+    `- Lot size: ${prop.lotSize ? `${prop.lotSize.toLocaleString()} sqft` : "Unknown"}`,
+    `- Year built: ${prop.yearBuilt ?? "Unknown"}`,
+    `- Zip code: ${prop.zipCode ?? "Unknown"}`,
+    "",
+    "## Sale History",
+    "",
+    `- Last sold date: ${prop.lastSaleDate ? new Date(prop.lastSaleDate).toLocaleDateString("en-US", { dateStyle: "long" }) : "Unknown"}`,
+    `- Last sold price: ${lastSalePrice ? `$${lastSalePrice.toLocaleString()}` : "Unknown"}`,
+    `- Last sale price per sqft: ${lastSalePrice && prop.squareFootage ? `$${Math.round(lastSalePrice / prop.squareFootage)}` : "Unknown"}`,
+  ];
+
+  if (prop.taxAssessments) {
+    const years = Object.keys(prop.taxAssessments).sort();
+    const latest = years[years.length - 1];
+    const prev = years[years.length - 2];
+    lines.push("", "## Tax Assessment", "");
+    lines.push(`- Latest assessment year: ${latest ?? "Unknown"}`);
+    lines.push(`- Latest assessed value: ${latest && prop.taxAssessments[latest]?.value ? `$${prop.taxAssessments[latest].value.toLocaleString()}` : "Unknown"}`);
+    if (latest && prev && prop.taxAssessments[latest]?.value && prop.taxAssessments[prev]?.value) {
+      const change = prop.taxAssessments[latest].value - prop.taxAssessments[prev].value;
+      const pct = ((change / prop.taxAssessments[prev].value) * 100).toFixed(1);
+      lines.push(`- Year-over-year change: ${change >= 0 ? "+" : ""}${pct}%`);
+    }
+  }
+
+  const features: string[] = [];
+  if (prop.features?.pool) features.push("Pool");
+  if (prop.features?.garage) features.push(`${prop.features.garageSpaces ?? 1}-car garage`);
+  if (prop.features?.fireplace) features.push("Fireplace");
+  if (prop.hoa?.fee) features.push(`HOA $${prop.hoa.fee}/mo`);
+  if (features.length) {
+    lines.push("", "## Notable Features", "");
+    for (const feature of features) lines.push(`- ${feature}`);
+  }
+
+  if (market?.saleData) {
+    const s = market.saleData;
+    lines.push("", "## Zip Code Market Stats", "");
+    lines.push(`- Median sale price: ${s.medianPrice ? `$${Number(s.medianPrice).toLocaleString()}` : "Unknown"}`);
+    lines.push(`- Average sale price: ${s.averagePrice ? `$${Number(s.averagePrice).toLocaleString()}` : "Unknown"}`);
+    lines.push(`- Median price per sqft: ${s.medianPricePerSquareFoot ? `$${s.medianPricePerSquareFoot.toFixed(0)}` : "Unknown"}`);
+    lines.push(`- Median days on market: ${s.medianDaysOnMarket != null ? `${s.medianDaysOnMarket} days` : "Unknown"}`);
+    lines.push(`- Average days on market: ${s.averageDaysOnMarket != null ? `${s.averageDaysOnMarket.toFixed(0)} days` : "Unknown"}`);
+    lines.push(`- Active listings: ${s.totalListings ?? "Unknown"}`);
+  }
+
+  return lines.join("\n");
 }

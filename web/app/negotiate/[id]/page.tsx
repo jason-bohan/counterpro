@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { AppHeader } from "@/components/app-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2 } from "lucide-react";
 import { AI_TONE_OPTIONS, REGIONAL_TONE_OPTIONS, REALTOR_PERSONALITY_OPTIONS } from "@/lib/email-pipeline";
+const remarkGfm = require("remark-gfm").default ?? require("remark-gfm");
 
 type Message = {
   id: number;
@@ -236,6 +238,9 @@ export default function NegotiateThreadPage() {
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [togglingGmailCopy, setTogglingGmailCopy] = useState(false);
   const [fetchingPropertyDetails, setFetchingPropertyDetails] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<NegotiationDocument | null>(null);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Archive confirmation
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -885,6 +890,29 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const isMarkdownDocument = (doc: NegotiationDocument) =>
+    doc.mime_type.startsWith("text/markdown") || doc.filename.toLowerCase().endsWith(".md");
+
+  const openDocument = async (doc: NegotiationDocument) => {
+    if (!isMarkdownDocument(doc)) {
+      window.open(doc.blob_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setPreviewDoc(doc);
+    setPreviewLoading(true);
+    setPreviewContent("");
+    try {
+      const res = await fetch(doc.blob_url);
+      const text = await res.text();
+      setPreviewContent(text);
+    } catch {
+      setPreviewContent("Could not load this document preview.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const saveAiTone = async () => {
     if (!negotiation || !id) return;
     setSavingAiTone(true);
@@ -1203,10 +1231,9 @@ export default function NegotiateThreadPage() {
                             const isOutbound = m.direction === "outbound" || m.direction === "proactive";
                             return (
                               <div key={doc.id} className="inline-flex items-center gap-1 group">
-                                <a
-                                  href={doc.blob_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => openDocument(doc)}
                                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                                     isOutbound
                                       ? "bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground"
@@ -1216,7 +1243,7 @@ export default function NegotiateThreadPage() {
                                 >
                                   <span className="text-sm">{icon}</span>
                                   <span className="truncate max-w-[200px]">{doc.filename}</span>
-                                </a>
+                                </button>
                                 <button
                                   onClick={async () => {
                                     if (!confirm(`Delete "${doc.filename}"?`)) return;
@@ -2079,11 +2106,10 @@ export default function NegotiateThreadPage() {
                   {documents.map(doc => {
                     const icon = doc.mime_type === "application/pdf" ? "📄" : doc.mime_type.startsWith("image/") ? "🖼️" : "📎";
                     return (
-                      <a
+                      <button
                         key={doc.id}
-                        href={doc.blob_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        type="button"
+                        onClick={() => openDocument(doc)}
                         className="flex items-center gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted transition-colors group"
                       >
                         <span className="text-base shrink-0">{icon}</span>
@@ -2096,7 +2122,7 @@ export default function NegotiateThreadPage() {
                             {doc.size_bytes ? ` · ${Math.round(doc.size_bytes / 1024)}KB` : ""}
                           </p>
                         </div>
-                      </a>
+                      </button>
                     );
                   })}
                 </CardContent>
@@ -2121,6 +2147,37 @@ export default function NegotiateThreadPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!previewDoc} onOpenChange={open => { if (!open) { setPreviewDoc(null); setPreviewContent(""); } }}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewDoc?.filename ?? "Document preview"}</DialogTitle>
+            <DialogDescription>
+              {previewDoc ? `${previewDoc.direction === "sent" ? "Sent" : "Received"} · ${relativeTime(previewDoc.created_at)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto pr-1">
+            {previewLoading ? (
+              <div className="py-12 text-sm text-muted-foreground">Loading preview...</div>
+            ) : previewDoc && isMarkdownDocument(previewDoc) ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {previewContent}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <div className="py-12 text-sm text-muted-foreground">Preview not available for this file type.</div>
+            )}
+          </div>
+          {previewDoc && (
+            <DialogFooter>
+              <Button variant="outline" asChild>
+                <a href={previewDoc.blob_url} target="_blank" rel="noopener noreferrer">Open original</a>
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* AI Settings Dialog */}
       <Dialog open={showAiSettings} onOpenChange={setShowAiSettings}>
