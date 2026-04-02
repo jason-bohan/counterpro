@@ -99,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!neg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { status, counterparty_email, deadline_date, autonomous_mode, archived, ai_tone } = body;
+  const { status, counterparty_email, deadline_date, autonomous_mode, archived, ai_tone, gmail_copy_enabled } = body;
   const normalizedCounterpartyEmail =
     counterparty_email !== undefined
       ? (typeof counterparty_email === "string" && counterparty_email.trim() !== ""
@@ -114,6 +114,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (autonomous_mode !== undefined && typeof autonomous_mode !== "boolean") {
     return NextResponse.json({ error: "autonomous_mode must be a boolean" }, { status: 400 });
+  }
+
+  if (gmail_copy_enabled !== undefined && typeof gmail_copy_enabled !== "boolean") {
+    return NextResponse.json({ error: "gmail_copy_enabled must be a boolean" }, { status: 400 });
   }
 
   let parsedDeadline: string | null = null;
@@ -136,11 +140,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       counterparty_email = COALESCE(${normalizedCounterpartyEmail ?? null}, counterparty_email),
       deadline_date = COALESCE(${parsedDeadline}, deadline_date),
       autonomous_mode = COALESCE(${autonomous_mode !== undefined ? autonomous_mode : null}::boolean, autonomous_mode),
+      gmail_copy_enabled = COALESCE(${gmail_copy_enabled !== undefined ? gmail_copy_enabled : null}::boolean, gmail_copy_enabled),
       ai_tone = COALESCE(${resolvedTone ?? null}, ai_tone),
       ${archived !== undefined ? sql`archived_at = ${archived === true ? sql`NOW()` : null}` : sql`archived_at = archived_at`},
       updated_at = NOW()
     WHERE id = ${negotiationId} AND clerk_user_id = ${userId}
-    RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, ai_tone, updated_at
+    RETURNING id, status, counterparty_email, deadline_date, autonomous_mode, gmail_copy_enabled, ai_tone, updated_at
   `;
 
   return NextResponse.json({ ok: true, negotiation: updated });

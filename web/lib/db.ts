@@ -70,6 +70,7 @@ export async function setupDatabase() {
   await m("negotiations.updated_at", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
   await m("negotiations.alias_email", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS alias_email TEXT`);
   await m("negotiations.autonomous_mode", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS autonomous_mode BOOLEAN NOT NULL DEFAULT FALSE`);
+  await m("negotiations.gmail_copy_enabled", sql`ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS gmail_copy_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
 
   await sql`
     CREATE TABLE IF NOT EXISTS negotiation_messages (

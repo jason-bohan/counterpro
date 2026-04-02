@@ -57,6 +57,7 @@ type Negotiation = {
   created_at: string;
   autonomous_mode: boolean;
   ai_tone: string;
+  gmail_copy_enabled?: boolean;
   gmail_token?: string | null;
   paired_counterparty_confirmed?: boolean;
   paired_counterparty_address?: string | null;
@@ -232,6 +233,7 @@ export default function NegotiateThreadPage() {
 
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
+  const [togglingGmailCopy, setTogglingGmailCopy] = useState(false);
 
   // Archive confirmation
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -361,6 +363,7 @@ export default function NegotiateThreadPage() {
                 if (
                   prev.counterparty_email !== nextNegotiation.counterparty_email ||
                   prev.autonomous_mode !== nextNegotiation.autonomous_mode ||
+                  prev.gmail_copy_enabled !== nextNegotiation.gmail_copy_enabled ||
                   prev.status !== nextNegotiation.status ||
                   prev.paired_counterparty_confirmed !== nextNegotiation.paired_counterparty_confirmed ||
                   prev.paired_counterparty_address !== nextNegotiation.paired_counterparty_address ||
@@ -838,6 +841,22 @@ export default function NegotiateThreadPage() {
       setNegotiation({ ...negotiation, autonomous_mode: next });
     } finally {
       setTogglingAuto(false);
+    }
+  };
+
+  const toggleGmailCopy = async () => {
+    if (!negotiation) return;
+    setTogglingGmailCopy(true);
+    const next = !negotiation.gmail_copy_enabled;
+    try {
+      await fetch(`/api/negotiate-suite/threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gmail_copy_enabled: next }),
+      });
+      setNegotiation({ ...negotiation, gmail_copy_enabled: next });
+    } finally {
+      setTogglingGmailCopy(false);
     }
   };
 
@@ -1797,6 +1816,33 @@ export default function NegotiateThreadPage() {
                     </div>
                   )}
                 </div>
+                {isPairedCounterparty && (
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium leading-tight">Email me copies</p>
+                        <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                          Forward paired-thread activity to your Gmail for record-keeping
+                        </p>
+                      </div>
+                      <button
+                        onClick={toggleGmailCopy}
+                        disabled={togglingGmailCopy}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none disabled:opacity-50 ${
+                          negotiation.gmail_copy_enabled ? "bg-blue-600" : "bg-muted-foreground/30"
+                        }`}
+                        role="switch"
+                        aria-checked={Boolean(negotiation.gmail_copy_enabled)}
+                      >
+                        <span
+                          className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                            negotiation.gmail_copy_enabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Autonomous mode toggle */}
                 <div className="pt-2 border-t" data-tour="autopilot">
                   <div className="flex items-center justify-between gap-3">

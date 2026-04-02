@@ -83,3 +83,52 @@ export async function sendNegotiationResultEmail(opts: {
     throw new Error("Failed to send negotiation result email via Gmail");
   }
 }
+
+export async function sendNegotiationActivityCopyEmail(opts: {
+  clerkUserId: string;
+  negotiationId: number;
+  address: string;
+  direction: "sent" | "received";
+  message: string;
+  counterpartyLabel?: string | null;
+}): Promise<void> {
+  const user = await getClerkUser(opts.clerkUserId);
+  if (!user) return;
+
+  const sendAsUserId = (await getAccessToken(opts.clerkUserId))
+    ? opts.clerkUserId
+    : process.env.GMAIL_SYSTEM_USER_ID;
+
+  if (!sendAsUserId) {
+    console.warn("[notify] No Gmail sender available; skipping activity copy email");
+    return;
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://counterproai.com";
+  const threadUrl = `${appUrl}/negotiate/${opts.negotiationId}`;
+  const from = process.env.GMAIL_SALES_ADDRESS ?? "CounterPro <notifications@counterproai.com>";
+  const directionLabel = opts.direction === "sent" ? "Sent message copy" : "Received message copy";
+  const counterpartyLine = opts.counterpartyLabel ? `Counterparty: ${opts.counterpartyLabel}` : null;
+
+  const text = [
+    user.firstName ? `Hi ${user.firstName},` : "Hi,",
+    "",
+    `${directionLabel} for ${opts.address}.`,
+    counterpartyLine,
+    "",
+    "Message:",
+    opts.message,
+    "",
+    `View thread: ${threadUrl}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await sendGmail(
+    sendAsUserId,
+    user.email,
+    `${directionLabel}: ${opts.address}`,
+    text,
+    from,
+  );
+}

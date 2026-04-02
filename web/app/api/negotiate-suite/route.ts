@@ -5,10 +5,16 @@ import { sql, setupDatabase, canUserRunSuite } from "@/lib/db";
 import { getAccessToken, sendGmail as sendGmailLib, type GmailAttachment } from "@/lib/gmail";
 import { put } from "@vercel/blob";
 import { buildNegotiationPrompt, SUITE_SYSTEM_PROMPT, stripMarkdown, stripAiPreamble } from "@/lib/email-pipeline";
-import { CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
+import { ALIAS_DOMAIN, CLAUDE_MODEL, SUITE_MAX_TOKENS } from "@/lib/constants";
 import { buildDocumentBlobPath } from "@/lib/utils";
+import { sendNegotiationActivityCopyEmail } from "@/lib/notify";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const COUNTERPRO_ALIAS_SUFFIX = `@${ALIAS_DOMAIN}`;
+
+function isCounterProAlias(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.toLowerCase().endsWith(COUNTERPRO_ALIAS_SUFFIX);
+}
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -170,7 +176,7 @@ export async function PUT(req: NextRequest) {
   // Verify ownership. The approved = false guard prevents a double-send from
   // creating a second outbound record if the same messageId is submitted twice.
   const [msg] = await sql`
-    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email
+    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email, n.gmail_copy_enabled
     FROM negotiation_messages nm
     JOIN negotiations n ON n.id = nm.negotiation_id
     WHERE nm.id = ${messageId} AND n.clerk_user_id = ${userId} AND nm.approved = false
@@ -276,6 +282,21 @@ export async function PUT(req: NextRequest) {
     }
   }
 
+  if (sent && msg.gmail_copy_enabled && isCounterProAlias(msg.counterparty_email)) {
+    try {
+      await sendNegotiationActivityCopyEmail({
+        clerkUserId: userId,
+        negotiationId: msg.negotiation_id,
+        address: msg.address,
+        direction: "sent",
+        message: plainText,
+        counterpartyLabel: msg.counterparty_email,
+      });
+    } catch (err) {
+      console.error("[negotiate-suite] Failed to send Gmail copy email:", err);
+    }
+  }
+
   return NextResponse.json({ ok: true, sent });
 }
 
@@ -292,7 +313,7 @@ export async function PATCH(req: NextRequest) {
   const { messageId } = await req.json();
 
   const [msg] = await sql`
-    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email
+    SELECT nm.*, n.clerk_user_id, n.counterparty_email, n.address, n.alias_email, n.gmail_copy_enabled
     FROM negotiation_messages nm
     JOIN negotiations n ON n.id = nm.negotiation_id
     WHERE nm.id = ${messageId}
@@ -343,6 +364,21 @@ export async function PATCH(req: NextRequest) {
 
   if (sent) {
     await sql`UPDATE negotiation_messages SET sent_at = NOW() WHERE id = ${messageId}`;
+
+    if (msg.gmail_copy_enabled && isCounterProAlias(msg.counterparty_email)) {
+      try {
+        await sendNegotiationActivityCopyEmail({
+          clerkUserId: userId,
+          negotiationId: msg.negotiation_id,
+          address: msg.address,
+          direction: "sent",
+          message: msg.content,
+          counterpartyLabel: msg.counterparty_email,
+        });
+      } catch (err) {
+        console.error("[negotiate-suite] Failed to send Gmail copy email on resend:", err);
+      }
+    }
   }
 
   return NextResponse.json({ ok: true, sent });
