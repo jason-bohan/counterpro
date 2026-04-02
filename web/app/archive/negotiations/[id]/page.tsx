@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 
 type ArchivedNegotiation = {
@@ -113,15 +112,7 @@ export default function ArchivedNegotiationPage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Logo size={44} href="/archive" />
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="text-xs">Archived</Badge>
-            <UserButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader right={<Badge variant="outline" className="text-xs">Archived</Badge>} />
 
       <main className="max-w-5xl mx-auto px-8 py-6">
         {/* Header */}

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserButton } from "@clerk/nextjs";
+import { AppHeader } from "@/components/app-header";
 
 type PromoCode = { code: string; deals_granted: number; uses_remaining: number; created_at: string };
 type Inquiry = { id: number; name: string; email: string; company: string; agents: string; message: string; created_at: string };
@@ -165,18 +165,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">← Dashboard</Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-semibold text-sm">Admin</span>
-            <span className="text-muted-foreground">/</span>
-            <Link href="/admin/api-status" className="text-sm text-muted-foreground hover:text-foreground transition-colors">API Status</Link>
-          </div>
-          <UserButton />
-        </div>
-      </header>
+      <AppHeader nav={[{ label: "Admin", href: "/admin" }, { label: "API Status", href: "/admin/api-status" }]} />
 
       <main className="max-w-5xl mx-auto px-6 py-10">
         <div className="mb-8">

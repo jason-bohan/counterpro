@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { AppHeader } from "@/components/app-header";
 import ReactMarkdown from "react-markdown";
 import { SupportEmail } from "@/components/support-email";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,7 +34,6 @@ const MARKET_OPTIONS = [
 ];
 
 export default function DealPage() {
-  const { user } = useUser();
   const [form, setForm] = useState({
     role: "buyer",
     address: "",
@@ -180,22 +179,7 @@ export default function DealPage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="border-b bg-background">
-        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              ← Dashboard
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium text-sm">New deal</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {user?.firstName && <span className="text-sm text-muted-foreground">{user.firstName}</span>}
-            <UserButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-3xl mx-auto px-6 py-10">
         {!result ? (

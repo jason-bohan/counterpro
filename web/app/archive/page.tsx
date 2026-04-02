@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/logo";
+import { AppHeader } from "@/components/app-header";
 
 type ArchivedDeal = {
   id: number;
@@ -91,20 +90,7 @@ export default function ArchivePage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Logo size={44} href="/" />
-          <div className="flex items-center gap-4">
-            <Link href="/negotiate" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Negotiations
-            </Link>
-            <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <UserButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-5xl mx-auto px-8 py-10">
         <div className="mb-8">
