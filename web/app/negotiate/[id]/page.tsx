@@ -1310,20 +1310,10 @@ export default function NegotiateThreadPage() {
             {!pendingDraft && (
               <div className="flex flex-col gap-2">
                 {!showInbound && !showProactive ? (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" onClick={() => setShowInbound(true)}>
                       + Add their message
                     </Button>
-                    {latestInboundAwaitingReply && (
-                      <Button variant="outline" onClick={replyWithAiNow} disabled={quickReplying || generatingReply}>
-                        {quickReplying ? (
-                          <span className="flex items-center gap-2">
-                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            Sending...
-                          </span>
-                        ) : "Reply with AI"}
-                      </Button>
-                    )}
                     <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply || quickReplying}>
                       {generatingReply ? (
                         <span className="flex items-center gap-2">
@@ -1332,6 +1322,23 @@ export default function NegotiateThreadPage() {
                         </span>
                       ) : "Compose with AI"}
                     </Button>
+                    {latestInboundAwaitingReply && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={replyWithAiNow}
+                        disabled={quickReplying || generatingReply}
+                        className="text-muted-foreground hover:text-foreground text-xs"
+                        title="Generate and send immediately without review"
+                      >
+                        {quickReplying ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Sending...
+                          </span>
+                        ) : "Quick Reply ↑"}
+                      </Button>
+                    )}
                   </div>
                 ) : showInbound ? (
                   <Card>
