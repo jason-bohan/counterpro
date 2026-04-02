@@ -347,3 +347,31 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ ok: true, sent });
 }
+
+// Delete a failed outbound message (approved=true, sent_at IS NULL)
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
+  const { messageId } = await req.json();
+
+  const [row] = await sql`
+    DELETE FROM negotiation_messages
+    USING negotiations
+    WHERE negotiation_messages.id = ${messageId}
+      AND negotiation_messages.negotiation_id = negotiations.id
+      AND negotiation_messages.direction IN ('outbound', 'proactive')
+      AND negotiation_messages.approved = true
+      AND negotiation_messages.sent_at IS NULL
+      AND negotiations.clerk_user_id = ${userId}
+    RETURNING negotiation_messages.id
+  `;
+  if (!row) return NextResponse.json({ error: "Not found or already sent" }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}

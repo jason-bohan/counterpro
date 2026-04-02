@@ -220,8 +220,9 @@ export default function NegotiateThreadPage() {
   const [pairingAliasValue, setPairingAliasValue] = useState("");
   const [savingPairing, setSavingPairing] = useState(false);
 
-  // Resend
+  // Resend / delete failed messages
   const [resending, setResending] = useState<number | null>(null);
+  const [deletingFailed, setDeletingFailed] = useState<number | null>(null);
 
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
@@ -648,6 +649,20 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const deleteFailedMessage = async (messageId: number) => {
+    setDeletingFailed(messageId);
+    try {
+      await fetch("/api/negotiate-suite", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      load();
+    } finally {
+      setDeletingFailed(null);
+    }
+  };
+
   const saveEmail = async () => {
     setSavingEmail(true);
     try {
@@ -1069,10 +1084,17 @@ export default function NegotiateThreadPage() {
                             <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
                             <button
                               onClick={() => resendMessage(m.id)}
-                              disabled={resending === m.id}
+                              disabled={resending === m.id || deletingFailed === m.id}
                               className="text-xs text-primary-foreground/70 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 shrink-0"
                             >
                               {resending === m.id ? "Sending..." : "Retry"}
+                            </button>
+                            <button
+                              onClick={() => deleteFailedMessage(m.id)}
+                              disabled={deletingFailed === m.id || resending === m.id}
+                              className="text-xs text-red-400 hover:text-red-300 underline underline-offset-2 disabled:opacity-50 shrink-0"
+                            >
+                              {deletingFailed === m.id ? "Deleting..." : "Delete"}
                             </button>
                           </>
                         )}
