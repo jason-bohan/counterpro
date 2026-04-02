@@ -18,12 +18,16 @@ export async function GET(req: NextRequest) {
 
   if (!neg) return NextResponse.json({ error: "Invalid or expired pairing link" }, { status: 404 });
 
-  // Don't expose sensitive data — only what the landing page needs
+  // "Paired" means counterparty_email is a CounterPro alias (set by the pairing flow),
+  // not a manually-entered real email address.
+  const alreadyPaired = typeof neg.counterparty_email === "string" &&
+    neg.counterparty_email.toLowerCase().includes("@counterproai.com");
+
   return NextResponse.json({
     negotiationId: neg.id,
     address: neg.address,
     role: neg.role,
-    alreadyPaired: Boolean(neg.counterparty_email),
+    alreadyPaired,
   });
 }
 
