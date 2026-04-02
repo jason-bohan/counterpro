@@ -245,13 +245,13 @@ export default function NegotiateThreadPage() {
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [aiTone, setAiTone] = useState("professional");
   const [aiCustomTone, setAiCustomTone] = useState("");
-  const [aiRegionalTone, setAiRegionalTone] = useState("");
-  const [aiRealtorPersonality, setAiRealtorPersonality] = useState("");
+  const [aiRegionalTone, setAiRegionalTone] = useState("none");
+  const [aiRealtorPersonality, setAiRealtorPersonality] = useState("none");
   const [savingAiTone, setSavingAiTone] = useState(false);
 
   // Draft refine panel
   const [showRefine, setShowRefine] = useState(false);
-  const [draftToneOverride, setDraftToneOverride] = useState("");
+  const [draftToneOverride, setDraftToneOverride] = useState("none");
   const [draftCustomToneOverride, setDraftCustomToneOverride] = useState("");
   const [draftHints, setDraftHints] = useState("");
 
@@ -304,8 +304,8 @@ export default function NegotiateThreadPage() {
         }
         
         // Set regional and personality tones if present
-        if (regionalTone) setAiRegionalTone(regionalTone);
-        if (personalityTone) setAiRealtorPersonality(personalityTone);
+        setAiRegionalTone(regionalTone || "none");
+        setAiRealtorPersonality(personalityTone || "none");
         // Sync pending draft from DB
         const pending = getLatestPendingInboundDraft(d.messages ?? []);
         if (pending) {
@@ -402,7 +402,7 @@ export default function NegotiateThreadPage() {
     try {
       const toneOverride = draftToneOverride === "custom"
         ? draftCustomToneOverride || undefined
-        : draftToneOverride || undefined;
+        : (draftToneOverride && draftToneOverride !== "none") ? draftToneOverride : undefined;
       const res = await fetch("/api/negotiate-suite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -755,10 +755,10 @@ export default function NegotiateThreadPage() {
       // Build combined tone from base tone + regional + personality
       let toneValue = aiTone === "custom" ? aiCustomTone : aiTone;
       
-      // Add regional and personality prefixes if selected
+      // Add regional and personality prefixes if selected ("none" = no selection)
       const components = [toneValue];
-      if (aiRegionalTone) components.push(aiRegionalTone);
-      if (aiRealtorPersonality) components.push(aiRealtorPersonality);
+      if (aiRegionalTone && aiRegionalTone !== "none") components.push(aiRegionalTone);
+      if (aiRealtorPersonality && aiRealtorPersonality !== "none") components.push(aiRealtorPersonality);
       
       // Store as combined string with pipe delimiter
       toneValue = components.join("|");
@@ -1140,7 +1140,7 @@ export default function NegotiateThreadPage() {
                               <SelectValue placeholder="Use negotiation default" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Use negotiation default</SelectItem>
+                              <SelectItem value="none">Use negotiation default</SelectItem>
                               {AI_TONE_OPTIONS.map(o => (
                                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                               ))}
@@ -1965,7 +1965,7 @@ export default function NegotiateThreadPage() {
                   <SelectValue placeholder="Select a region (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {REGIONAL_TONE_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -1986,7 +1986,7 @@ export default function NegotiateThreadPage() {
                   <SelectValue placeholder="Select a personality (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {REALTOR_PERSONALITY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       <div className="flex flex-col">
