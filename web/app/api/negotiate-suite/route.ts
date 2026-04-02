@@ -19,17 +19,17 @@ export async function POST(req: NextRequest) {
   const allowed = await canUserRunSuite(userId);
   if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
 
-  const { negotiationId, newMessage, replyToMessageId } = await req.json();
+  const { negotiationId, newMessage, replyToMessageId, toneOverride, hints } = await req.json();
 
   // Generate a draft for an existing inbound message that has not been handled yet.
   if (replyToMessageId) {
     const [target] = await sql`
-      SELECT nm.*, n.address
+      SELECT nm.*, n.address, n.ai_tone
       FROM negotiation_messages nm
       JOIN negotiations n ON n.id = nm.negotiation_id
       WHERE nm.id = ${replyToMessageId}
         AND nm.negotiation_id = ${negotiationId}
-        AND nm.direction = 'inbound'
+        AND nm.direction IN ('inbound', 'proactive')
         AND n.clerk_user_id = ${userId}
     `;
     if (!target) return NextResponse.json({ error: "Reply target not found" }, { status: 404 });
@@ -41,11 +41,20 @@ export async function POST(req: NextRequest) {
       ORDER BY created_at ASC
     `;
 
+    // For proactive drafts (no specific inbound message), generate a follow-up
+    // based on conversation history only (no "new message from counterparty").
+    const incomingMessage = target.direction === "proactive"
+      ? "(Generate a proactive follow-up based on the conversation history above.)"
+      : target.content;
+
+    const resolvedTone = toneOverride ?? target.ai_tone ?? "professional";
+    const hintsLine = hints ? `\nAdditional guidance: ${hints}` : "";
     const prompt = buildNegotiationPrompt(
       target.address,
       history as Array<{ direction: string; content: string }>,
-      target.content
-    );
+      incomingMessage,
+      resolvedTone
+    ) + hintsLine;
 
     const message = await client.messages.create({
       model: CLAUDE_MODEL,
@@ -337,4 +346,32 @@ export async function PATCH(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, sent });
+}
+
+// Delete a failed outbound message (approved=true, sent_at IS NULL)
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await setupDatabase();
+
+  const allowed = await canUserRunSuite(userId);
+  if (!allowed) return NextResponse.json({ error: "Suite plan required" }, { status: 403 });
+
+  const { messageId } = await req.json();
+
+  const [row] = await sql`
+    DELETE FROM negotiation_messages
+    USING negotiations
+    WHERE negotiation_messages.id = ${messageId}
+      AND negotiation_messages.negotiation_id = negotiations.id
+      AND negotiation_messages.direction IN ('outbound', 'proactive')
+      AND negotiation_messages.approved = true
+      AND negotiation_messages.sent_at IS NULL
+      AND negotiations.clerk_user_id = ${userId}
+    RETURNING negotiation_messages.id
+  `;
+  if (!row) return NextResponse.json({ error: "Not found or already sent" }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
 }

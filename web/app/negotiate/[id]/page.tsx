@@ -220,8 +220,9 @@ export default function NegotiateThreadPage() {
   const [pairingAliasValue, setPairingAliasValue] = useState("");
   const [savingPairing, setSavingPairing] = useState(false);
 
-  // Resend
+  // Resend / delete failed messages
   const [resending, setResending] = useState<number | null>(null);
+  const [deletingFailed, setDeletingFailed] = useState<number | null>(null);
 
   // Autonomous mode
   const [togglingAuto, setTogglingAuto] = useState(false);
@@ -240,14 +241,21 @@ export default function NegotiateThreadPage() {
   const [offerCustomTone, setOfferCustomTone] = useState("");
   const [generatingFirst, setGeneratingFirst] = useState(false);
   const [generatingReply, setGeneratingReply] = useState(false);
+  const [quickReplying, setQuickReplying] = useState(false);
 
   // AI Settings
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [aiTone, setAiTone] = useState("professional");
   const [aiCustomTone, setAiCustomTone] = useState("");
-  const [aiRegionalTone, setAiRegionalTone] = useState("");
-  const [aiRealtorPersonality, setAiRealtorPersonality] = useState("");
+  const [aiRegionalTone, setAiRegionalTone] = useState("none");
+  const [aiRealtorPersonality, setAiRealtorPersonality] = useState("none");
   const [savingAiTone, setSavingAiTone] = useState(false);
+
+  // Draft refine panel
+  const [showRefine, setShowRefine] = useState(false);
+  const [draftToneOverride, setDraftToneOverride] = useState("none");
+  const [draftCustomToneOverride, setDraftCustomToneOverride] = useState("");
+  const [draftHints, setDraftHints] = useState("");
 
   // Deadline form
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
@@ -298,8 +306,8 @@ export default function NegotiateThreadPage() {
         }
         
         // Set regional and personality tones if present
-        if (regionalTone) setAiRegionalTone(regionalTone);
-        if (personalityTone) setAiRealtorPersonality(personalityTone);
+        setAiRegionalTone(regionalTone || "none");
+        setAiRealtorPersonality(personalityTone || "none");
         // Sync pending draft from DB
         const pending = getLatestPendingInboundDraft(d.messages ?? []);
         if (pending) {
@@ -394,12 +402,17 @@ export default function NegotiateThreadPage() {
     if (!pendingDraft || !id) return;
     setGeneratingReply(true);
     try {
+      const toneOverride = draftToneOverride === "custom"
+        ? draftCustomToneOverride || undefined
+        : (draftToneOverride && draftToneOverride !== "none") ? draftToneOverride : undefined;
       const res = await fetch("/api/negotiate-suite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           negotiationId: Number(id),
           replyToMessageId: pendingDraft.messageId,
+          toneOverride,
+          hints: draftHints.trim() || undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to regenerate AI reply.");
@@ -437,6 +450,37 @@ export default function NegotiateThreadPage() {
       alert(err instanceof Error ? err.message : "Failed to generate AI reply.");
     } finally {
       setGeneratingReply(false);
+    }
+  };
+
+  // Reply with AI: generate + approve + send immediately (no review step)
+  const replyWithAiNow = async () => {
+    if (!latestInboundAwaitingReply || !id) return;
+    setQuickReplying(true);
+    try {
+      const genRes = await fetch("/api/negotiate-suite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          negotiationId: Number(id),
+          replyToMessageId: latestInboundAwaitingReply.id,
+        }),
+      });
+      if (!genRes.ok) throw new Error("Failed to generate AI reply.");
+      const { messageId } = await genRes.json();
+
+      const sendRes = await fetch("/api/negotiate-suite", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, approved: true }),
+      });
+      if (!sendRes.ok) throw new Error("Failed to send reply.");
+      window.dispatchEvent(new Event("notifications-updated"));
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to send AI reply.");
+    } finally {
+      setQuickReplying(false);
     }
   };
 
@@ -618,6 +662,20 @@ export default function NegotiateThreadPage() {
     }
   };
 
+  const deleteFailedMessage = async (messageId: number) => {
+    setDeletingFailed(messageId);
+    try {
+      await fetch("/api/negotiate-suite", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
+      load();
+    } finally {
+      setDeletingFailed(null);
+    }
+  };
+
   const saveEmail = async () => {
     setSavingEmail(true);
     try {
@@ -757,10 +815,10 @@ export default function NegotiateThreadPage() {
       // Build combined tone from base tone + regional + personality
       let toneValue = aiTone === "custom" ? aiCustomTone : aiTone;
       
-      // Add regional and personality prefixes if selected
+      // Add regional and personality prefixes if selected ("none" = no selection)
       const components = [toneValue];
-      if (aiRegionalTone) components.push(aiRegionalTone);
-      if (aiRealtorPersonality) components.push(aiRealtorPersonality);
+      if (aiRegionalTone && aiRegionalTone !== "none") components.push(aiRegionalTone);
+      if (aiRealtorPersonality && aiRealtorPersonality !== "none") components.push(aiRealtorPersonality);
       
       // Store as combined string with pipe delimiter
       toneValue = components.join("|");
@@ -1039,10 +1097,17 @@ export default function NegotiateThreadPage() {
                             <Badge className="text-xs h-4 shrink-0 bg-red-500/20 text-red-300 border border-red-500/30">Send failed</Badge>
                             <button
                               onClick={() => resendMessage(m.id)}
-                              disabled={resending === m.id}
+                              disabled={resending === m.id || deletingFailed === m.id}
                               className="text-xs text-primary-foreground/70 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 shrink-0"
                             >
                               {resending === m.id ? "Sending..." : "Retry"}
+                            </button>
+                            <button
+                              onClick={() => deleteFailedMessage(m.id)}
+                              disabled={deletingFailed === m.id || resending === m.id}
+                              className="text-xs text-red-400 hover:text-red-300 underline underline-offset-2 disabled:opacity-50 shrink-0"
+                            >
+                              {deletingFailed === m.id ? "Deleting..." : "Delete"}
                             </button>
                           </>
                         )}
@@ -1120,6 +1185,56 @@ export default function NegotiateThreadPage() {
                     onChange={e => setEditedDraft(e.target.value)}
                     className="text-sm font-mono resize-y"
                   />
+
+                  {/* Refine panel */}
+                  <div className="rounded-md border border-border bg-muted/40">
+                    <button
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowRefine(v => !v)}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Settings2 className="w-3.5 h-3.5" />
+                        Refine AI response
+                      </span>
+                      <span>{showRefine ? "▲" : "▼"}</span>
+                    </button>
+                    {showRefine && (
+                      <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Tone override</label>
+                          <Select value={draftToneOverride} onValueChange={setDraftToneOverride}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Use negotiation default" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Use negotiation default</SelectItem>
+                              {AI_TONE_OPTIONS.map(o => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {draftToneOverride === "custom" && (
+                            <Input
+                              className="h-8 text-xs mt-1"
+                              placeholder="Describe the tone..."
+                              value={draftCustomToneOverride}
+                              onChange={e => setDraftCustomToneOverride(e.target.value)}
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Keywords / extra context for AI</label>
+                          <Input
+                            className="text-xs h-8"
+                            placeholder="e.g. mention inspection contingency, be firm on price"
+                            value={draftHints}
+                            onChange={e => setDraftHints(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex flex-wrap gap-3">
                     {hasEmail ? (
                       <Button
@@ -1147,7 +1262,12 @@ export default function NegotiateThreadPage() {
                       {copied ? "✓ Copied" : "Copy to clipboard"}
                     </Button>
                     <Button variant="outline" onClick={regeneratePendingReply} disabled={sending || generatingReply}>
-                      {generatingReply ? "Regenerating..." : "Regenerate"}
+                      {generatingReply ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Regenerating...
+                        </span>
+                      ) : "Regenerate"}
                     </Button>
                     {/* File attachment */}
                     <input
@@ -1203,18 +1323,38 @@ export default function NegotiateThreadPage() {
             {!pendingDraft && (
               <div className="flex flex-col gap-2">
                 {!showInbound && !showProactive ? (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" onClick={() => setShowInbound(true)}>
                       + Add their message
                     </Button>
+                    <Button variant="outline" onClick={() => { setShowProactive(true); setShowInbound(false); }}>
+                      Write your own
+                    </Button>
+                    <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply || quickReplying}>
+                      {generatingReply ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Composing...
+                        </span>
+                      ) : "Compose with AI"}
+                    </Button>
                     {latestInboundAwaitingReply && (
-                      <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
-                        {generatingReply ? "Generating..." : "Reply with AI"}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={replyWithAiNow}
+                        disabled={quickReplying || generatingReply}
+                        className="text-muted-foreground hover:text-foreground text-xs"
+                        title="Generate and send immediately without review"
+                      >
+                        {quickReplying ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Sending...
+                          </span>
+                        ) : "Quick Reply ↑"}
                       </Button>
                     )}
-                    <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply}>
-                      {generatingReply ? "Generating..." : "Compose with AI"}
-                    </Button>
                   </div>
                 ) : showInbound ? (
                   <Card>
@@ -1252,12 +1392,12 @@ export default function NegotiateThreadPage() {
                   <Card>
                     <CardHeader className="pb-2 pt-4">
                       <CardTitle className="text-base">
-                        {refinedDraft ? "AI refined your message" : "Compose a new message"}
+                        {refinedDraft ? "AI-polished draft" : "Write your own message"}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
                         {refinedDraft
-                          ? "Review and send, or go back to edit your original."
-                          : "Use this for a manual outbound note, or generate a reply to the latest inbound message from here."}
+                          ? "Review and edit before sending, or go back to your original."
+                          : "Type your message and send it as-is, or press \"Polish with AI\" to have AI refine the tone and wording first."}
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -1403,33 +1543,7 @@ export default function NegotiateThreadPage() {
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-3">
-                            {latestInboundAwaitingReply && (
-                              <Button
-                                onClick={generateReplyFromLatestInbound}
-                                disabled={generatingReply || proactiveDrafting || quickSending}
-                                variant="outline"
-                              >
-                                {generatingReply ? (
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    Generating...
-                                  </span>
-                                ) : "Reply with AI"}
-                              </Button>
-                            )}
-                            <Button
-                              onClick={submitProactive}
-                              disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
-                              variant="outline"
-                            >
-                              {proactiveDrafting ? (
-                                <span className="flex items-center gap-2">
-                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                  AI is refining...
-                                </span>
-                              ) : "Refine with AI →"}
-                            </Button>
+                          <div className="flex gap-3 flex-wrap">
                             <Button
                               onClick={quickSendProactive}
                               disabled={quickSending || proactiveDrafting || !proactiveMsg.trim()}
@@ -1439,7 +1553,19 @@ export default function NegotiateThreadPage() {
                                   <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                   Sending...
                                 </span>
-                              ) : "Quick Send"}
+                              ) : "Send →"}
+                            </Button>
+                            <Button
+                              onClick={submitProactive}
+                              disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
+                              variant="outline"
+                            >
+                              {proactiveDrafting ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  Polishing...
+                                </span>
+                              ) : "Polish with AI"}
                             </Button>
                             <Button variant="ghost" onClick={() => {
                               setShowProactive(false);
@@ -1868,22 +1994,22 @@ export default function NegotiateThreadPage() {
 
       {/* AI Settings Dialog */}
       <Dialog open={showAiSettings} onOpenChange={setShowAiSettings}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>AI Settings</DialogTitle>
             <DialogDescription>
               Configure how AI behaves in this negotiation.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            {/* Default Tone Setting */}
-            <div className="space-y-3">
+          <div className="space-y-5 py-2 overflow-y-auto flex-1 pr-1">
+            {/* Default Tone */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Default Response Tone</label>
                 <p className="text-xs text-muted-foreground">Applied to all AI-generated replies unless overridden</p>
               </div>
               <Select value={aiTone} onValueChange={setAiTone}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a tone" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1894,32 +2020,28 @@ export default function NegotiateThreadPage() {
                   ))}
                 </SelectContent>
               </Select>
-              
               {aiTone === "custom" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Custom Tone Instructions</label>
-                  <Textarea
-                    placeholder="e.g., Be very friendly and casual, use emojis, and keep sentences short..."
-                    value={aiCustomTone}
-                    onChange={(e) => setAiCustomTone(e.target.value)}
-                    rows={3}
-                  />
-                </div>
+                <Textarea
+                  placeholder="e.g., Be very friendly and casual, use emojis, and keep sentences short..."
+                  value={aiCustomTone}
+                  onChange={(e) => setAiCustomTone(e.target.value)}
+                  rows={3}
+                />
               )}
             </div>
 
-            {/* Regional Tone Setting */}
-            <div className="space-y-3">
+            {/* Regional Style */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Regional Style</label>
                 <p className="text-xs text-muted-foreground">Market-specific communication approach</p>
               </div>
               <Select value={aiRegionalTone} onValueChange={setAiRegionalTone}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a region (optional)" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {REGIONAL_TONE_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -1929,75 +2051,29 @@ export default function NegotiateThreadPage() {
               </Select>
             </div>
 
-            {/* Realtor Personality Setting */}
-            <div className="space-y-3">
+            {/* Realtor Personality */}
+            <div className="space-y-2">
               <div>
                 <label className="text-sm font-medium">Realtor Personality</label>
                 <p className="text-xs text-muted-foreground">Sales approach and communication style</p>
               </div>
               <Select value={aiRealtorPersonality} onValueChange={setAiRealtorPersonality}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a personality (optional)" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {REALTOR_PERSONALITY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span>{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.desc}</span>
-                      </div>
+                      <span>{option.label}</span>
+                      <span className="ml-1.5 text-xs text-muted-foreground">{option.desc}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Additional AI Settings */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Response Style</label>
-                <p className="text-xs text-muted-foreground">How detailed should AI responses be?</p>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="concise" className="text-primary" />
-                  <span className="text-sm">Concise - Short and to the point</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="balanced" defaultChecked className="text-primary" />
-                  <span className="text-sm">Balanced - Moderate detail</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="responseStyle" value="detailed" className="text-primary" />
-                  <span className="text-sm">Detailed - Thorough explanations</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Autonomous Mode Settings */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Autonomous Mode Behavior</label>
-                <p className="text-xs text-muted-foreground">When auto-pilot is enabled</p>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" defaultChecked className="text-primary" />
-                  <span className="text-sm">Pause on detected agreements</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" defaultChecked className="text-primary" />
-                  <span className="text-sm">Include market data in responses</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="checkbox" className="text-primary" />
-                  <span className="text-sm">More conservative offers</span>
-                </label>
-              </div>
-            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 pt-2">
             <Button variant="outline" onClick={() => setShowAiSettings(false)}>
               Cancel
             </Button>
