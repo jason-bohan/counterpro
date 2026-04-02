@@ -23,11 +23,28 @@ export async function GET(req: NextRequest) {
   const alreadyPaired = typeof neg.counterparty_email === "string" &&
     neg.counterparty_email.toLowerCase().includes("@counterproai.com");
 
+  // Fetch the first sent message so the counterparty sees context
+  const [firstMsg] = await sql`
+    SELECT content, ai_draft
+    FROM negotiation_messages
+    WHERE negotiation_id = ${neg.id}
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+  const rawPreview = firstMsg
+    ? (firstMsg.content === "[First contact]" ? firstMsg.ai_draft : firstMsg.content) ?? null
+    : null;
+  // Strip the CounterPro footer (everything from "---" onward)
+  const previewMessage = rawPreview
+    ? rawPreview.replace(/\n---\n[\s\S]*$/, "").trim()
+    : null;
+
   return NextResponse.json({
     negotiationId: neg.id,
     address: neg.address,
     role: neg.role,
     alreadyPaired,
+    previewMessage,
   });
 }
 

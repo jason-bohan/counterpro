@@ -14,6 +14,7 @@ type PairInfo = {
   address: string;
   role: string;
   alreadyPaired: boolean;
+  previewMessage: string | null;
 };
 
 type MyThread = {
@@ -33,8 +34,11 @@ function PairPageInner() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState("");
   const [pairing, setPairing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [paired, setPaired] = useState(false);
+  const [pairedNegId, setPairedNegId] = useState<number | null>(null);
   const [hasSuite, setHasSuite] = useState<boolean | null>(null);
+  const [showFullMessage, setShowFullMessage] = useState(false);
 
   // Fetch pairing info (no auth needed)
   useEffect(() => {
@@ -64,24 +68,51 @@ function PairPageInner() {
       .catch(() => {});
   }, [isLoaded, user]);
 
-  const handlePair = async () => {
-    if (!selectedId || !token) return;
+  const handlePair = async (negId: number) => {
+    if (!token) return;
     setPairing(true);
     try {
       const res = await fetch("/api/pair", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, myNegotiationId: selectedId }),
+        body: JSON.stringify({ token, myNegotiationId: negId }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error || "Pairing failed."); return; }
+      setPairedNegId(negId);
       setPaired(true);
     } finally {
       setPairing(false);
     }
   };
 
+  // Create a new negotiation for this property then immediately pair it
+  const handleCreateAndPair = async () => {
+    if (!token || !pairInfo) return;
+    setCreating(true);
+    try {
+      const counterRole = pairInfo.role === "buyer" ? "seller" : "buyer";
+      const createRes = await fetch("/api/negotiate-suite/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: pairInfo.address, role: counterRole }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) { alert(createData.error || "Failed to create negotiation."); return; }
+      await handlePair(createData.id);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const counterRole = pairInfo?.role === "buyer" ? "seller" : "buyer";
+
+  const previewText = pairInfo?.previewMessage ?? null;
+  const PREVIEW_LIMIT = 220;
+  const previewTruncated = previewText && previewText.length > PREVIEW_LIMIT;
+  const previewDisplay = previewText
+    ? (showFullMessage || !previewTruncated ? previewText : previewText.slice(0, PREVIEW_LIMIT) + "…")
+    : null;
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
@@ -115,7 +146,7 @@ function PairPageInner() {
                   Your negotiation for <span className="font-medium">{pairInfo.address}</span> is now synced.
                   Messages will route automatically between both parties.
                 </p>
-                <Button onClick={() => router.push(`/negotiate/${selectedId}`)}>
+                <Button onClick={() => router.push(`/negotiate/${pairedNegId}`)}>
                   Go to your negotiation →
                 </Button>
               </CardContent>
@@ -142,6 +173,24 @@ function PairPageInner() {
                     Once paired, messages route automatically — no manual copy-pasting needed.
                   </p>
                 </CardHeader>
+
+                {/* Initial message preview */}
+                {previewDisplay && (
+                  <CardContent className="pt-0">
+                    <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground text-xs uppercase tracking-wide mb-2">Their opening message</p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{previewDisplay}</p>
+                      {previewTruncated && (
+                        <button
+                          onClick={() => setShowFullMessage(v => !v)}
+                          className="mt-2 text-xs underline underline-offset-2 hover:text-foreground transition-colors"
+                        >
+                          {showFullMessage ? "Show less" : "Show full message"}
+                        </button>
+                      )}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
 
               {!isLoaded ? null : !user ? (
@@ -174,52 +223,55 @@ function PairPageInner() {
               ) : (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Select your negotiation to link</CardTitle>
-                    <p className="text-sm text-muted-foreground">Pick the negotiation you opened for this property.</p>
+                    <CardTitle className="text-base">Link your negotiation</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Select an existing negotiation for this property, or create one now.
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {myThreads.length === 0 ? (
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">You don&apos;t have any active negotiations yet.</p>
-                        <Link href={`/negotiate?prefill=${encodeURIComponent(pairInfo.address)}`}>
-                          <Button variant="outline" className="w-full">
-                            + Create a negotiation for this property
-                          </Button>
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-2">
-                          {myThreads.map(t => (
-                            <button
-                              key={t.id}
-                              onClick={() => setSelectedId(t.id)}
-                              className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                                selectedId === t.id
-                                  ? "border-primary bg-primary/5"
-                                  : "border-border hover:border-primary/50"
-                              }`}
-                            >
-                              <p className="font-medium text-sm">{t.address}</p>
-                              <p className="text-xs text-muted-foreground capitalize">{t.role}</p>
-                            </button>
-                          ))}
-                        </div>
+                    {myThreads.length > 0 && (
+                      <div className="space-y-2">
+                        {myThreads.map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedId(t.id)}
+                            className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                              selectedId === t.id
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <p className="font-medium text-sm">{t.address}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{t.role}</p>
+                          </button>
+                        ))}
                         <Button
                           className="w-full"
-                          disabled={!selectedId || pairing}
-                          onClick={handlePair}
+                          disabled={!selectedId || pairing || creating}
+                          onClick={() => selectedId && handlePair(selectedId)}
                         >
-                          {pairing ? "Linking…" : "Link negotiations →"}
+                          {pairing ? "Linking…" : "Link selected negotiation →"}
                         </Button>
-                        <p className="text-xs text-muted-foreground text-center">
-                          Don&apos;t see the right one?{" "}
-                          <Link href="/negotiate" className="underline underline-offset-2 hover:text-foreground">
-                            Create a new negotiation first
-                          </Link>
-                        </p>
-                      </>
+                        <div className="relative flex items-center gap-2 py-1">
+                          <div className="flex-1 border-t border-border" />
+                          <span className="text-xs text-muted-foreground">or</span>
+                          <div className="flex-1 border-t border-border" />
+                        </div>
+                      </div>
                     )}
+
+                    {/* Inline create + pair */}
+                    <Button
+                      variant={myThreads.length > 0 ? "outline" : "default"}
+                      className="w-full"
+                      disabled={creating || pairing}
+                      onClick={handleCreateAndPair}
+                    >
+                      {creating ? "Creating & linking…" : `+ Create negotiation for ${pairInfo.address} & link`}
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      You&apos;ll be added as the <span className="font-medium capitalize">{counterRole}</span> on this property.
+                    </p>
                   </CardContent>
                 </Card>
               )}
