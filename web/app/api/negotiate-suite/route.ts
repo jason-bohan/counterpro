@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       JOIN negotiations n ON n.id = nm.negotiation_id
       WHERE nm.id = ${replyToMessageId}
         AND nm.negotiation_id = ${negotiationId}
-        AND nm.direction = 'inbound'
+        AND nm.direction IN ('inbound', 'proactive')
         AND n.clerk_user_id = ${userId}
     `;
     if (!target) return NextResponse.json({ error: "Reply target not found" }, { status: 404 });
@@ -41,12 +41,18 @@ export async function POST(req: NextRequest) {
       ORDER BY created_at ASC
     `;
 
+    // For proactive drafts (no specific inbound message), generate a follow-up
+    // based on conversation history only (no "new message from counterparty").
+    const incomingMessage = target.direction === "proactive"
+      ? "(Generate a proactive follow-up based on the conversation history above.)"
+      : target.content;
+
     const resolvedTone = toneOverride ?? target.ai_tone ?? "professional";
     const hintsLine = hints ? `\nAdditional guidance: ${hints}` : "";
     const prompt = buildNegotiationPrompt(
       target.address,
       history as Array<{ direction: string; content: string }>,
-      target.content,
+      incomingMessage,
       resolvedTone
     ) + hintsLine;
 

@@ -1195,7 +1195,12 @@ export default function NegotiateThreadPage() {
                       {copied ? "✓ Copied" : "Copy to clipboard"}
                     </Button>
                     <Button variant="outline" onClick={regeneratePendingReply} disabled={sending || generatingReply}>
-                      {generatingReply ? "Regenerating..." : "Regenerate"}
+                      {generatingReply ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Regenerating...
+                        </span>
+                      ) : "Regenerate"}
                     </Button>
                     {/* File attachment */}
                     <input
