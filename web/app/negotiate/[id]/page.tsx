@@ -1314,6 +1314,9 @@ export default function NegotiateThreadPage() {
                     <Button variant="outline" onClick={() => setShowInbound(true)}>
                       + Add their message
                     </Button>
+                    <Button variant="outline" onClick={() => { setShowProactive(true); setShowInbound(false); }}>
+                      Write your own
+                    </Button>
                     <Button variant="outline" onClick={generateReplyFromLatestInbound} disabled={generatingReply || quickReplying}>
                       {generatingReply ? (
                         <span className="flex items-center gap-2">
@@ -1376,12 +1379,12 @@ export default function NegotiateThreadPage() {
                   <Card>
                     <CardHeader className="pb-2 pt-4">
                       <CardTitle className="text-base">
-                        {refinedDraft ? "AI refined your message" : "Compose a new message"}
+                        {refinedDraft ? "AI-polished draft" : "Write your own message"}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
                         {refinedDraft
-                          ? "Review and send, or go back to edit your original."
-                          : "Use this for a manual outbound note, or generate a reply to the latest inbound message from here."}
+                          ? "Review and edit before sending, or go back to your original."
+                          : "Type your message and send it as-is, or press \"Polish with AI\" to have AI refine the tone and wording first."}
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -1525,33 +1528,7 @@ export default function NegotiateThreadPage() {
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-3">
-                            {latestInboundAwaitingReply && (
-                              <Button
-                                onClick={generateReplyFromLatestInbound}
-                                disabled={generatingReply || proactiveDrafting || quickSending}
-                                variant="outline"
-                              >
-                                {generatingReply ? (
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    Generating...
-                                  </span>
-                                ) : "Reply with AI"}
-                              </Button>
-                            )}
-                            <Button
-                              onClick={submitProactive}
-                              disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
-                              variant="outline"
-                            >
-                              {proactiveDrafting ? (
-                                <span className="flex items-center gap-2">
-                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                  AI is refining...
-                                </span>
-                              ) : "Refine with AI →"}
-                            </Button>
+                          <div className="flex gap-3 flex-wrap">
                             <Button
                               onClick={quickSendProactive}
                               disabled={quickSending || proactiveDrafting || !proactiveMsg.trim()}
@@ -1561,7 +1538,19 @@ export default function NegotiateThreadPage() {
                                   <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                   Sending...
                                 </span>
-                              ) : "Quick Send"}
+                              ) : "Send →"}
+                            </Button>
+                            <Button
+                              onClick={submitProactive}
+                              disabled={proactiveDrafting || quickSending || !proactiveMsg.trim()}
+                              variant="outline"
+                            >
+                              {proactiveDrafting ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  Polishing...
+                                </span>
+                              ) : "Polish with AI"}
                             </Button>
                             <Button variant="ghost" onClick={() => {
                               setShowProactive(false);
