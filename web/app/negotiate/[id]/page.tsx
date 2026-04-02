@@ -149,7 +149,13 @@ function onboardingStorageKey(base: string, userId: string | null | undefined): 
 function getLatestPendingInboundDraft(messages: Message[]): Message | null {
   return [...messages]
     .reverse()
-    .find((m) => Boolean(m.ai_draft) && !m.approved && (m.direction === "inbound" || m.direction === "proactive")) ?? null;
+    .find((m) => Boolean(m.ai_draft) && !m.approved && m.direction === "inbound") ?? null;
+}
+
+function getLatestPendingProactiveDraft(messages: Message[]): Message | null {
+  return [...messages]
+    .reverse()
+    .find((m) => Boolean(m.ai_draft) && !m.approved && m.direction === "proactive") ?? null;
 }
 
 function getMessageProvenanceBadge(message: Message): { label: string; className: string } | null {
@@ -309,12 +315,24 @@ export default function NegotiateThreadPage() {
         setAiRegionalTone(regionalTone || "none");
         setAiRealtorPersonality(personalityTone || "none");
         // Sync pending draft from DB
-        const pending = getLatestPendingInboundDraft(d.messages ?? []);
-        if (pending) {
-          setPendingDraft({ draft: pending.ai_draft!, messageId: pending.id });
-          setEditedDraft(pending.ai_draft!);
+        const pendingInbound = getLatestPendingInboundDraft(d.messages ?? []);
+        if (pendingInbound) {
+          setPendingDraft({ draft: pendingInbound.ai_draft!, messageId: pendingInbound.id });
+          setEditedDraft(pendingInbound.ai_draft!);
         } else {
           setPendingDraft(null);
+        }
+
+        const pendingProactive = getLatestPendingProactiveDraft(d.messages ?? []);
+        if (pendingProactive) {
+          setRefinedDraft({
+            text: pendingProactive.ai_draft!,
+            messageId: pendingProactive.id,
+            original: pendingProactive.content,
+          });
+          setShowProactive(true);
+        } else {
+          setRefinedDraft(null);
         }
         setLoading(false);
       })
@@ -376,6 +394,21 @@ export default function NegotiateThreadPage() {
                 );
               } else {
                 setPendingDraft(null);
+              }
+
+              const pendingProactive = getLatestPendingProactiveDraft(nextMessages);
+              if (pendingProactive) {
+                setRefinedDraft(prev =>
+                  prev?.messageId === pendingProactive.id
+                    ? prev
+                    : {
+                        text: pendingProactive.ai_draft!,
+                        messageId: pendingProactive.id,
+                        original: pendingProactive.content,
+                      }
+                );
+              } else {
+                setRefinedDraft(null);
               }
               return;
             }
@@ -1058,7 +1091,9 @@ export default function NegotiateThreadPage() {
                 </Card>
               )}
 
-              {messages.filter(m => m.content !== "[First contact]").map(m => {
+              {messages
+                .filter(m => m.content !== "[First contact]" && !(m.direction === "proactive" && !m.approved))
+                .map(m => {
                 const provenanceBadge = getMessageProvenanceBadge(m);
                 const messageDocuments = documents.filter(doc =>
                   doc.message_id != null
