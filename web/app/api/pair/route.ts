@@ -108,20 +108,22 @@ export async function POST(req: NextRequest) {
     SELECT 1 FROM negotiation_messages WHERE negotiation_id = ${mine.id} LIMIT 1
   `;
   if (!mineHasMessages) {
-    const theirSent = await sql`
+    // Copy only the first sent message (the opening offer/first contact)
+    const [firstMsg] = await sql`
       SELECT content, ai_draft, sent_at, created_at
       FROM negotiation_messages
       WHERE negotiation_id = ${theirs.id}
         AND approved = true
       ORDER BY created_at ASC
+      LIMIT 1
     `;
-    for (const msg of theirSent) {
-      const body = msg.content === "[First contact]"
-        ? (msg.ai_draft ?? msg.content)
-        : msg.content;
+    if (firstMsg) {
+      const body = firstMsg.content === "[First contact]"
+        ? (firstMsg.ai_draft ?? firstMsg.content)
+        : firstMsg.content;
       await sql`
         INSERT INTO negotiation_messages (negotiation_id, direction, content, approved, sent_at, created_at)
-        VALUES (${mine.id}, 'inbound', ${body}, true, ${msg.sent_at ?? msg.created_at}, ${msg.created_at})
+        VALUES (${mine.id}, 'inbound', ${body}, true, ${firstMsg.sent_at ?? firstMsg.created_at}, ${firstMsg.created_at})
       `;
     }
   }
